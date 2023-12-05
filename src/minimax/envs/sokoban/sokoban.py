@@ -1,10 +1,16 @@
 from minimax.envs import environment, spaces
 import jax
+from jax import lax
 import jax.numpy as jnp
 from enum import IntEnum
-
+import chex
+from flax import struct
+from flax.core.frozen_dict import FrozenDict
 import pkg_resources
-from PIL import Image
+
+from collections import namedtuple, OrderedDict
+
+from typing import Tuple, Optional
 
 class Actions(IntEnum):
     left = 0
@@ -23,11 +29,34 @@ class FieldStates(IntEnum):
 
 RENDERING_MODES = ['one_hot', 'rgb_array', 'tiny_rgb_array']
 
+@struct.dataclass
+class EnvState:
+    agent_pos: chex.Array
+    goal_pos: chex.Array
+    wall_map: chex.Array
+    maze_map: chex.Array
+    act_map: chex.Array
+    start_map: chex.Array
+    time: int
+    terminal: bool
+    unmatched_boxes: int
+
+
+@struct.dataclass
+class EnvParams:
+    height: int = 15
+    width: int = 15
+    replace_wall_pos: bool = False
+    max_episode_steps: int = 250
+    singleton_seed: int = -1
+    mode: str = "one_hot"
+    num_boxes: int = 4
+
 class Sokoban(environment.Environment):
     def __init__(
         self,
         dim_room=(10, 10),
-        max_steps=np.inf,
+        max_steps=jnp.inf,
         num_boxes=4,
         num_gen_steps=None,
         mode="one_hot",
@@ -41,38 +70,69 @@ class Sokoban(environment.Environment):
         load_boards_from_file=None,
         load_boards_lazy=True,
     ):
-        self._seed = seed
-        self.mode = mode
-        self.num_gen_steps = num_gen_steps
-        self.dim_room = dim_room
-        self.max_steps = max_steps
-        self.num_boxes = num_boxes
+        
+        super().__init__()
+        self.obs_shape = (self.dim_room[0], self.dim_room[1], 7)
+        self.action_set = jnp.array([Actions.left, Actions.right, Actions.up, Actions.down])
 
+        self.params = EnvParams(
+            height=dim_room[0],
+            width=dim_room[1],
+            #replace_wall_pos=replace_wall_pos and not sample_n_walls,
+            mode = mode,
+            max_episode_steps = max_steps,
+            num_boxes = num_boxes
+            #max_episode_steps=max_episode_steps,
+            #normalize_obs=normalize_obs,
+            #sample_n_walls=sample_n_walls,
+            #obs_agent_pos=obs_agent_pos,
+            singleton_seed=-1,
+            num_gen_steps = num_gen_steps
+            penalty_for_step = penalty_for_step
+            reward_box_on_target = reward_box_on_target
+            reward_finished = reward_finished
+        )
+        
         # Penalties and Rewards
-        self.penalty_for_step = penalty_for_step
         # self.penalty_box_off_target = penalty_box_off_target
-        self.reward_box_on_target = reward_box_on_target
-        self.reward_finished = reward_finished
-        self.action_space = jnp.array([Actions.left, Actions.right, Actions.up, Actions.down])
-        self.observation_space = (self.dim_room[0], self.dim_room[1], 7)
-        self.state_space = self.observation_space  # state == observation
+        
+        
+        #self.state_space = self.observation_space  # state == observation
 
-        self._internal_state = None
-        self.fast_state_eq = fast_state_eq
+        #self._internal_state = None
+        #self.fast_state_eq = fast_state_eq
 
-        self._surfaces = load_surfaces()
-        self.initial_internal_state_hash = None
+        #self._surfaces = load_surfaces()
+        #self.initial_internal_state_hash = None
         #self.load_boards_from_file = load_boards_from_file
         #self.boards_from_file = None
         
-    def step_student(self, action):
-        raw_state, rew, done = step(self._internal_state.get_raw(), action,
-                                    self.penalty_for_step,
-                                    self.reward_box_on_target,
-                                    self.reward_finished)
-        self._internal_state = HashableState(*raw_state, fast_eq=self.fast_state_eq)
-        return self._internal_state.one_hot, rew, done, {"solved": done}
+    def step_env(self,
+                 key: chex.PRNGKey,
+                 state: EnvState,
+                 action: int
+        ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+        a = self.action_set[action]
+        state, reward = self.step_agent(key, state, a)
+        state = state.replace(time=state.time)
+        done = self.is_terminal(state)
+        state = state.replace(terminal=done)
+        return (
+            lax.stop_gradient(self.get_obs(state)),
+            lax.stop_gradient(state),
+            reward.astype(jnp.float32),
+            done,
+            {},
+        )
+        #self._internal_state = HashableState(*raw_state, fast_eq=self.fast_state_eq)
+        #return (self._internal_state.one_hot, rew, done, {"solved": done}
 
+    def reset_env(
+        self,
+        key: chex.PRNGKey
+    ) -> Tuple[chex.Array, EnvState]:
+        assert False, "Not implemented yet" 
+    
     def generate_default_room(self):
         """
         Generates basic empty Sokoban room with one box, represented by an integer matrix.
@@ -93,21 +153,132 @@ class Sokoban(environment.Environment):
         
         return room
     
+    def get_obs(self, state: EnvState) -> chex.Array:
+        """Return grid view."""
+    
+        image = state.act_map.astype(jnp.uint8)
+        if self.params.normalize_obs:
+            image = image/10.0
 
-    def reset(self):
-        #if self.load_boards_from_file:
-        #    if self.boards_from_file is None: # the case of lazy loading
-        #        self.boards_from_file = np.load(self.load_boards_from_file)
-        #    index = random.randint(0, len(self.boards_from_file)-1)
-        #    one_hot = self.boards_from_file[index]
-        #else:
-        #    self._slave_env.reset()
-        #    one_hot = self._slave_env.render(mode="one_hot")
-        self.game_start_room = self.generate_default_room()
-        self.restore_full_state_from_np_array_version(self.game_start_room)
-        self.initial_internal_state_hash = hash(self._internal_state)
-        return self._internal_state.one_hot
-   
+        obs_dict = dict(
+            image=image
+        )
+
+        return OrderedDict(obs_dict)
+    
+    def step_agent(self, key: chex.PRNGKey, state: EnvState, action: int) -> Tuple[EnvState, float]:
+        # Copy to be supported by numba. Possibly can be done better
+        # wall = 0
+        empty = 1
+        target = 2
+        box_target = 3
+        box = 4
+        player = 5
+        player_target = 6
+
+        delta_x, delta_y = None, None
+        if action == 0:
+            delta_x, delta_y = -1, 0
+        elif action == 1:
+            delta_x, delta_y = 1, 0
+        elif action == 2:
+            delta_x, delta_y = 0, -1
+        elif action == 3:
+            delta_x, delta_y = 0, 1
+
+        one_hot = state.act_map
+        agent_pos = state.agent_pos
+        unmatched_boxes = state.unmatched_boxes
+
+        arena = jnp.zeros(shape=(3,), dtype=jnp.uint8)
+        for i in range(3):
+            index_x = agent_pos[0] + i * delta_x
+            index_y = agent_pos[1] + i * delta_y
+            if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
+                arena[i] = jnp.where(one_hot[index_x, index_y, :] == 1)[0][0]
+
+        new_unmatched_boxes_ = unmatched_boxes
+        new_agent_pos = agent_pos
+        new_arena = jnp.copy(arena)
+
+        box_moves = (arena[1] == box or arena[1] == box_target) and \
+                    (arena[2] == empty or arena[2] == 2)
+
+        agent_moves = arena[1] == empty or arena[1] == target or box_moves
+
+        if agent_moves:
+            targets = (arena == target).astype(jnp.int8) + \
+                      (arena == box_target).astype(jnp.int8) + \
+                      (arena == player_target).astype(jnp.int8)
+            if box_moves:
+                last_field = box - 2 * targets[2]  # Weirdness due to inconsistent target non-target
+            else:
+                last_field = arena[2] - targets[2]
+
+            new_arena = jnp.array([empty, player, last_field]).astype(jnp.uint8) + targets.astype(jnp.uint8)
+            new_agent_pos = (agent_pos[0] + delta_x, agent_pos[1] + delta_y)
+
+            if box_moves:
+                new_unmatched_boxes_ = int(unmatched_boxes - (targets[2] - targets[1]))
+
+        new_one_hot = jnp.copy(one_hot)
+        for i in range(3):
+            index_x = agent_pos[0] + i * delta_x
+            index_y = agent_pos[1] + i * delta_y
+            if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
+                one_hot_field = jnp.zeros(shape=7)
+                one_hot_field[new_arena[i]] = 1
+                new_one_hot[index_x, index_y, :] = one_hot_field
+
+        done = (new_unmatched_boxes_ == 0)
+        reward = self.params.penalty_for_step - self.params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
+        if done:
+            reward += self.params.reward_finished
+
+        return (
+            state.replace(
+                act_map = new_one_hot,
+                agent_pos=new_agent_pos,
+                unmatched_boxes = new_unmatched_boxes_,
+                terminal = done),
+            reward
+        )
+    # def reset(self):
+    #     #if self.load_boards_from_file:
+    #     #    if self.boards_from_file is None: # the case of lazy loading
+    #     #        self.boards_from_file = np.load(self.load_boards_from_file)
+    #     #    index = random.randint(0, len(self.boards_from_file)-1)
+    #     #    one_hot = self.boards_from_file[index]
+    #     #else:
+    #     #    self._slave_env.reset()
+    #     #    one_hot = self._slave_env.render(mode="one_hot")
+    #     self.game_start_room = self.generate_default_room()
+    #     self.restore_full_state_from_np_array_version(self.game_start_room)
+    #     self.initial_internal_state_hash = hash(self._internal_state)
+    #     return self._internal_state.one_hot
+    def is_terminal(self, state: EnvState) -> bool:
+        """Check whether state is terminal."""
+        done_steps = state.time >= self.params.max_episode_steps
+        return jnp.logical_or(done_steps, state.terminal)
+    
+    @property
+    def name(self) -> str:
+        """Environment name."""
+        return "Maze"
+
+    @property
+    def num_actions(self) -> int:
+        """Number of actions possible in environment."""
+        return len(self.action_set)
+
+    def action_space(self) -> spaces.Discrete:
+        """Action space of the environment."""
+        return spaces.Discrete(
+            len(self.action_set),
+            dtype=jnp.uint32
+        )
+    
+    
     def reset_student(self):
         self.restore_full_state_from_np_array_version(self.game_start_room)
         starting_observation = self.render()
