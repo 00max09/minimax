@@ -12,6 +12,10 @@ from collections import namedtuple, OrderedDict
 
 from typing import Tuple, Optional
 
+from .common import (
+	EnvInstance)
+
+
 class Actions(IntEnum):
     left = 0
     right = 1
@@ -133,25 +137,41 @@ class Sokoban(environment.Environment):
     ) -> Tuple[chex.Array, EnvState]:
         assert False, "Not implemented yet" 
     
-    def generate_default_room(self):
+    def set_env_instance(
+            self,  
+            encoding: EnvInstance):
         """
-        Generates basic empty Sokoban room with one box, represented by an integer matrix.
-        The elements are encoded in one hot fashion
-        :return: Numpy 3d Array
+        Instance is encoded as a PyTree containing the following fields:
+        agent_pos, agent_dir, goal_pos, wall_map
         """
-        room = jnp.zeros(shape = (self.dim_room[0]+2, self.dim_room[1]+2, 7))
-        room[:][:][FieldStates.empty] = 1
-        for i in range(self.dim_room[0]+2):
-            room[i][0][FieldStates.wall] = 1
-            room[i][self.dim_room[1]+1][FieldStates.wall] = 1
-        for z in range(self.dim_room[1]+2):
-            room[0][z][FieldStates.wall] = 1
-            room[self.dim_room[0]+1][FieldStates.wall] = 1
-        room[2][2][FieldStates.player] = 1
-        room[3][3][FieldStates.box] = 1
-        room[4][4][FieldStates.box_target] = 1
-        
-        return room
+        params = self.params
+        agent_pos = encoding.agent_pos
+        agent_dir_idx = encoding.agent_dir_idx
+
+        agent_dir = DIR_TO_VEC.at[agent_dir_idx].get()
+        goal_pos = encoding.goal_pos
+        wall_map = encoding.wall_map
+        maze_map = make_maze_map(
+            params,
+            wall_map, 
+            goal_pos, 
+            agent_pos, 
+            agent_dir_idx, # ued instances include wall padding
+            pad_obs=True)
+
+        state = EnvState(
+            agent_pos=agent_pos,
+            agent_dir=agent_dir,
+            agent_dir_idx=agent_dir_idx,
+            goal_pos=goal_pos,
+            wall_map=wall_map,
+            maze_map=maze_map,
+            time=0,
+            terminal=False
+        )
+
+        return self.get_obs(state), state
+
     
     def get_obs(self, state: EnvState) -> chex.Array:
         """Return grid view."""
@@ -277,8 +297,30 @@ class Sokoban(environment.Environment):
             len(self.action_set),
             dtype=jnp.uint32
         )
+    def observation_space(self) -> spaces.Dict:
+        """Observation space of the environment."""
+        spaces_dict = {
+            'image':spaces.Box(0, 255, self.obs_shape),
+        }
+        return spaces.Dict(spaces_dict)
     
-    
+    def max_episode_steps(self) -> int:
+        return self.params.max_episode_steps
+
+    def get_env_metrics(self, state: EnvState) -> dict:
+        #n_walls = state.wall_map.sum()
+        # shortest_path_length = _graph_util.shortest_path_len(
+        #     state.wall_map,
+        #     state.agent_pos,
+        #     state.goal_pos
+        # )
+
+        return dict(
+            #n_walls=n_walls,
+        #    shortest_path_length=shortest_path_length,
+         #   passable=shortest_path_length > 0,
+        )
+
     def reset_student(self):
         self.restore_full_state_from_np_array_version(self.game_start_room)
         starting_observation = self.render()
@@ -323,77 +365,6 @@ def load_surfaces():
 
     return surfaces
 
-
-def step(state, action, penalty_for_step, reward_box_on_target, reward_finished):
-    # Copy to be supported by numba. Possibly can be done better
-    # wall = 0
-    empty = 1
-    target = 2
-    box_target = 3
-    box = 4
-    player = 5
-    player_target = 6
-
-    delta_x, delta_y = None, None
-    if action == 0:
-        delta_x, delta_y = -1, 0
-    elif action == 1:
-        delta_x, delta_y = 1, 0
-    elif action == 2:
-        delta_x, delta_y = 0, -1
-    elif action == 3:
-        delta_x, delta_y = 0, 1
-
-    one_hot, agent_pos, unmatched_boxes = state
-
-    arena = jnp.zeros(shape=(3,), dtype=jnp.uint8)
-    for i in range(3):
-        index_x = agent_pos[0] + i * delta_x
-        index_y = agent_pos[1] + i * delta_y
-        if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
-            arena[i] = jnp.where(one_hot[index_x, index_y, :] == 1)[0][0]
-
-    new_unmatched_boxes_ = unmatched_boxes
-    new_agent_pos = agent_pos
-    new_arena = jnp.copy(arena)
-
-    box_moves = (arena[1] == box or arena[1] == box_target) and \
-                (arena[2] == empty or arena[2] == 2)
-
-    agent_moves = arena[1] == empty or arena[1] == target or box_moves
-
-    if agent_moves:
-        targets = (arena == target).astype(jnp.int8) + \
-                  (arena == box_target).astype(jnp.int8) + \
-                  (arena == player_target).astype(jnp.int8)
-        if box_moves:
-            last_field = box - 2 * targets[2]  # Weirdness due to inconsistent target non-target
-        else:
-            last_field = arena[2] - targets[2]
-
-        new_arena = jnp.array([empty, player, last_field]).astype(jnp.uint8) + targets.astype(jnp.uint8)
-        new_agent_pos = (agent_pos[0] + delta_x, agent_pos[1] + delta_y)
-
-        if box_moves:
-            new_unmatched_boxes_ = int(unmatched_boxes - (targets[2] - targets[1]))
-
-    new_one_hot = jnp.copy(one_hot)
-    for i in range(3):
-        index_x = agent_pos[0] + i * delta_x
-        index_y = agent_pos[1] + i * delta_y
-        if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
-            one_hot_field = jnp.zeros(shape=7)
-            one_hot_field[new_arena[i]] = 1
-            new_one_hot[index_x, index_y, :] = one_hot_field
-
-    done = (new_unmatched_boxes_ == 0)
-    reward = penalty_for_step - reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
-    if done:
-        reward += reward_finished
-
-    new_state = (new_one_hot, new_agent_pos, new_unmatched_boxes_)
-
-    return new_state, reward, done
 
 class HashableState:
     state = jnp.random.get_state()
