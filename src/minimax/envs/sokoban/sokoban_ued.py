@@ -14,7 +14,7 @@ from flax.core.frozen_dict import FrozenDict
 
 from minimax.envs import environment, spaces
 from minimax.envs.registration import register_ued
-
+from .common import EnvInstance
 
 class SequentialActions(IntEnum):
     skip = 0
@@ -25,9 +25,11 @@ class SequentialActions(IntEnum):
 
 @struct.dataclass
 class EnvState:
-    encoding: chex.Array
+    maze_map: chex.Array
     time: int
     terminal: bool
+    agent_pos: chex.Array
+    unmatched_boxes: int
 
 class FieldStates(IntEnum):
     wall = 0
@@ -53,7 +55,7 @@ class EnvParams:
     singleton_seed: int = -1
 
 
-class UEDMaze(environment.Environment):
+class UEDSokoban(environment.Environment):
     def __init__(
         self,
         height=13,
@@ -193,3 +195,93 @@ class UEDMaze(environment.Environment):
             done,
             {}
         )
+
+    def get_env_instance(
+            self, 
+            key: chex.PRNGKey,
+            state: EnvState
+        ) -> chex.Array:
+        """
+        Converts internal encoding to an instance encoding that 
+        can be interpreted by the `set_to_instance` method 
+        the paired Environment class.
+        """
+
+        # Make wall map
+        maze_map = state.maze_map
+        agent_pos = state.agent_pos
+        unmatched_boxes = state.unmatched_boxes
+
+        return EnvInstance(
+            agent_pos=agent_pos,
+            maze_map=maze_map,
+            unmatched_boxes=unmatched_boxes
+        )
+    
+    def is_terminal(self, state: EnvState) -> bool:	
+        done_steps = state.time >= self.max_episode_steps()
+        return jnp.logical_or(done_steps, state.terminal)
+    
+    def _get_post_terminal_obs(self, state: EnvState):
+        dtype = jnp.float32 if self.params.normalize_obs else jnp.uint8
+        image = jnp.zeros((
+            self.params.height+2, self.params.width+2, 3), dtype=dtype
+        )
+
+        return OrderedDict(dict(
+            image=image,
+            time=state.time,
+            noise=jnp.zeros(self.params.noise_dim, dtype=jnp.float32),
+        ))
+
+    def get_obs(self, state: EnvState):
+        
+        image = state.maze_map
+        return OrderedDict(dict(
+            image = image,
+            time=state.time,
+        ))
+
+    @property
+    def default_params(self):
+        return EnvParams()
+    
+    @property
+    def name(self) -> str:
+        """Environment name."""
+        return "UEDSokoban"
+    
+    @property
+    def num_actions(self) -> int:
+        """Number of actions possible in environment."""
+        return len(self.action_set)
+    
+    def action_space(self) -> spaces.Discrete:
+        """Action space of the environment."""
+        params = self.params
+        return spaces.Discrete(
+            params.height*params.width,
+            dtype=jnp.uint32
+        )
+
+    def observation_space(self) -> spaces.Dict:
+        """Observation space of the environment."""
+        params = self.params
+        max_episode_steps = self.max_episode_steps()
+        spaces_dict = {
+            'image':spaces.Box(0, 255, (params.height+2, params.width+2, 3)),
+            'time': spaces.Discrete(max_episode_steps),
+        }
+        
+        return spaces.Dict(spaces_dict)
+    
+    def max_episode_steps(self) -> int:    
+        max_episode_steps = self.params.n_walls + 2 + self.params.num_boxes * 2 
+        return max_episode_steps
+    
+if hasattr(__loader__, 'name'):
+  module_path = __loader__.name
+elif hasattr(__loader__, 'fullname'):
+  module_path = __loader__.fullname
+
+register_ued(env_id='Sokoban', entry_point=module_path + ':UEDSokoban')    

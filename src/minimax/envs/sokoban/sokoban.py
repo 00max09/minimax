@@ -8,12 +8,13 @@ from flax import struct
 from flax.core.frozen_dict import FrozenDict
 import pkg_resources
 
+from minimax.envs.registration import register
 from collections import namedtuple, OrderedDict
 
 from typing import Tuple, Optional
 
 from .common import (
-	EnvInstance)
+    EnvInstance)
 
 
 class Actions(IntEnum):
@@ -36,10 +37,9 @@ RENDERING_MODES = ['one_hot', 'rgb_array', 'tiny_rgb_array']
 @struct.dataclass
 class EnvState:
     agent_pos: chex.Array
-    goal_pos: chex.Array
-    wall_map: chex.Array
+    #wall_map: chex.Array
     maze_map: chex.Array
-    act_map: chex.Array
+    #act_map: chex.Array
     start_map: chex.Array
     time: int
     terminal: bool
@@ -85,16 +85,16 @@ class Sokoban(environment.Environment):
             #replace_wall_pos=replace_wall_pos and not sample_n_walls,
             mode = mode,
             max_episode_steps = max_steps,
-            num_boxes = num_boxes
+            num_boxes = num_boxes,
             #max_episode_steps=max_episode_steps,
             #normalize_obs=normalize_obs,
             #sample_n_walls=sample_n_walls,
             #obs_agent_pos=obs_agent_pos,
             singleton_seed=-1,
-            num_gen_steps = num_gen_steps
-            penalty_for_step = penalty_for_step
-            reward_box_on_target = reward_box_on_target
-            reward_finished = reward_finished
+            num_gen_steps = num_gen_steps,
+            penalty_for_step = penalty_for_step,
+            reward_box_on_target = reward_box_on_target,
+            reward_finished = reward_finished,
         )
         
         # Penalties and Rewards
@@ -146,28 +146,17 @@ class Sokoban(environment.Environment):
         """
         params = self.params
         agent_pos = encoding.agent_pos
-        agent_dir_idx = encoding.agent_dir_idx
-
-        agent_dir = DIR_TO_VEC.at[agent_dir_idx].get()
-        goal_pos = encoding.goal_pos
-        wall_map = encoding.wall_map
-        maze_map = make_maze_map(
-            params,
-            wall_map, 
-            goal_pos, 
-            agent_pos, 
-            agent_dir_idx, # ued instances include wall padding
-            pad_obs=True)
+        maze_map = encoding.maze_map
+        unmatched_boxes = encoding.unmatched_boxes
+        
 
         state = EnvState(
             agent_pos=agent_pos,
-            agent_dir=agent_dir,
-            agent_dir_idx=agent_dir_idx,
-            goal_pos=goal_pos,
-            wall_map=wall_map,
             maze_map=maze_map,
+            start_map=maze_map,
             time=0,
-            terminal=False
+            terminal=False,
+            unmatched_boxes=unmatched_boxes
         )
 
         return self.get_obs(state), state
@@ -304,6 +293,20 @@ class Sokoban(environment.Environment):
         }
         return spaces.Dict(spaces_dict)
     
+
+    def state_space(self) -> spaces.Dict:
+        """State space of the environment."""
+        params = self.params
+        h = params.height
+        w = params.width
+        agent_view_size = params.agent_view_size
+        return spaces.Dict({
+            "agent_pos": spaces.Box(0, max(w, h), (2,), dtype=jnp.uint32),
+            "maze_map": spaces.Box(0, 255, (w + agent_view_size, h + agent_view_size, 3), dtype=jnp.uint32),
+            "time": spaces.Discrete(params.max_episode_steps),
+            "terminal": spaces.Discrete(2),
+        })
+    
     def max_episode_steps(self) -> int:
         return self.params.max_episode_steps
 
@@ -343,6 +346,9 @@ class Sokoban(environment.Environment):
         res = jnp.transpose(res, (0, 2, 1, 3, 4))
         res = jnp.reshape(res, (size_x, size_y, 3))
         return res
+
+    
+
 
 
 def load_surfaces():
@@ -403,3 +409,12 @@ class HashableState:
 
     def get_np_array_version(self):
         return self.one_hot
+
+# Register the env
+if hasattr(__loader__, 'name'):
+  module_path = __loader__.name
+elif hasattr(__loader__, 'fullname'):
+  module_path = __loader__.fullname
+
+register(env_id='Sokoban', entry_point=module_path + ':Sokoban')
+
