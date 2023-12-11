@@ -14,10 +14,17 @@ from .maze import (
 	GridWorldACTeacherModel,
 )
 
+from .sokoban import (
+	SokobanACStudentModel, 
+	SokobanACTeacherModel,    
+)
+
 
 __all__ = [
 	register,
 	make,
 	GridWorldACStudentModel,
 	GridWorldACTeacherModel,
+    SokobanACStudentModel,
+    SokobanACTeacherModel
 ]

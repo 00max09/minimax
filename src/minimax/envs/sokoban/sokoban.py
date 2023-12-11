@@ -37,9 +37,7 @@ RENDERING_MODES = ['one_hot', 'rgb_array', 'tiny_rgb_array']
 @struct.dataclass
 class EnvState:
     agent_pos: chex.Array
-    #wall_map: chex.Array
     maze_map: chex.Array
-    #act_map: chex.Array
     start_map: chex.Array
     time: int
     terminal: bool
@@ -71,8 +69,6 @@ class Sokoban(environment.Environment):
         reward_box_on_target=1,
         reward_finished=10,
         seed=None,
-        load_boards_from_file=None,
-        load_boards_lazy=True,
     ):
         
         super().__init__()
@@ -135,7 +131,7 @@ class Sokoban(environment.Environment):
         self,
         key: chex.PRNGKey
     ) -> Tuple[chex.Array, EnvState]:
-        assert False, "Not implemented yet" 
+        assert False, "Not implemented yet, hopefully not needed" 
     
     def set_env_instance(
             self,  
@@ -144,7 +140,7 @@ class Sokoban(environment.Environment):
         Instance is encoded as a PyTree containing the following fields:
         agent_pos, agent_dir, goal_pos, wall_map
         """
-        params = self.params
+        #params = self.params
         agent_pos = encoding.agent_pos
         maze_map = encoding.maze_map
         unmatched_boxes = encoding.unmatched_boxes
@@ -165,9 +161,9 @@ class Sokoban(environment.Environment):
     def get_obs(self, state: EnvState) -> chex.Array:
         """Return grid view."""
     
-        image = state.act_map.astype(jnp.uint8)
-        if self.params.normalize_obs:
-            image = image/10.0
+        image = state.maze_map.astype(jnp.uint8)
+        #if self.params.normalize_obs:
+        #    image = image/10.0
 
         obs_dict = dict(
             image=image
@@ -177,6 +173,7 @@ class Sokoban(environment.Environment):
     
     def step_agent(self, key: chex.PRNGKey, state: EnvState, action: int) -> Tuple[EnvState, float]:
         # Copy to be supported by numba. Possibly can be done better
+        params = self.params
         # wall = 0
         empty = 1
         target = 2
@@ -195,7 +192,7 @@ class Sokoban(environment.Environment):
         elif action == 3:
             delta_x, delta_y = 0, 1
 
-        one_hot = state.act_map
+        one_hot = state.maze_map
         agent_pos = state.agent_pos
         unmatched_boxes = state.unmatched_boxes
 
@@ -240,9 +237,9 @@ class Sokoban(environment.Environment):
                 new_one_hot[index_x, index_y, :] = one_hot_field
 
         done = (new_unmatched_boxes_ == 0)
-        reward = self.params.penalty_for_step - self.params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
+        reward = params.penalty_for_step - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
         if done:
-            reward += self.params.reward_finished
+            reward += params.reward_finished
 
         return (
             state.replace(
@@ -273,7 +270,7 @@ class Sokoban(environment.Environment):
     @property
     def name(self) -> str:
         """Environment name."""
-        return "Maze"
+        return "Sokoban"
 
     @property
     def num_actions(self) -> int:
@@ -286,6 +283,7 @@ class Sokoban(environment.Environment):
             len(self.action_set),
             dtype=jnp.uint32
         )
+    
     def observation_space(self) -> spaces.Dict:
         """Observation space of the environment."""
         spaces_dict = {
@@ -293,16 +291,15 @@ class Sokoban(environment.Environment):
         }
         return spaces.Dict(spaces_dict)
     
-
+    #box of maze map is probably wrong
     def state_space(self) -> spaces.Dict:
         """State space of the environment."""
         params = self.params
         h = params.height
         w = params.width
-        agent_view_size = params.agent_view_size
         return spaces.Dict({
             "agent_pos": spaces.Box(0, max(w, h), (2,), dtype=jnp.uint32),
-            "maze_map": spaces.Box(0, 255, (w + agent_view_size, h + agent_view_size, 3), dtype=jnp.uint32),
+            "maze_map": spaces.Box(0, 255, (w + 2, h + 2, 3), dtype=jnp.uint32),
             "time": spaces.Discrete(params.max_episode_steps),
             "terminal": spaces.Discrete(2),
         })
@@ -310,6 +307,7 @@ class Sokoban(environment.Environment):
     def max_episode_steps(self) -> int:
         return self.params.max_episode_steps
 
+    #@TODO
     def get_env_metrics(self, state: EnvState) -> dict:
         #n_walls = state.wall_map.sum()
         # shortest_path_length = _graph_util.shortest_path_len(
@@ -324,10 +322,10 @@ class Sokoban(environment.Environment):
          #   passable=shortest_path_length > 0,
         )
 
-    def reset_student(self):
-        self.restore_full_state_from_np_array_version(self.game_start_room)
-        starting_observation = self.render()
-        return starting_observation
+    # def reset_student(self):
+    #     self.restore_full_state_from_np_array_version(self.game_start_room)
+    #     starting_observation = self.render()
+    #     return starting_observation
         
     def render(self, mode='one_hot'):
         assert mode in RENDERING_MODES, f"Only {RENDERING_MODES} are supported, not {mode}"

@@ -97,26 +97,6 @@ class UEDSokoban(environment.Environment):
             set_agent_dir=set_agent_dir,
             normalize_obs=normalize_obs,
         )
-
-    def generate_default_room(self):
-        """
-        Generates basic empty Sokoban room with one box, represented by an integer matrix.
-        The elements are encoded in one hot fashion
-        :return: Numpy 3d Array
-        """
-        room = jnp.zeros(shape = (self.dim_room[0]+2, self.dim_room[1]+2, 7))
-        room[:][:][FieldStates.empty] = 1
-        for i in range(self.dim_room[0]+2):
-            room[i][0][FieldStates.wall] = 1
-            room[i][self.dim_room[1]+1][FieldStates.wall] = 1
-        for z in range(self.dim_room[1]+2):
-            room[0][z][FieldStates.wall] = 1
-            room[self.dim_room[0]+1][FieldStates.wall] = 1
-        room[2][2][FieldStates.player] = 1
-        room[3][3][FieldStates.box] = 1
-        room[4][4][FieldStates.box_target] = 1
-        
-        return room
     
     def step_env(
         self,
@@ -124,70 +104,67 @@ class UEDSokoban(environment.Environment):
         state: EnvState,
         action: int,
     ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
-        if action >= self.adversary_action_dim:
+        params = self.params
+        if action >= self.n_tiles:
             raise ValueError("Position passed to step_adversary is outside the grid.")
 
         # Resample block count if necessary, based on first loc
-        if self.resample_n_clutter and not self.n_clutter_sampled:
-            n_clutter = int((action / self.adversary_action_dim) * self.n_clutter)
-            self.adversary_max_steps = n_clutter + 2
-            self.n_clutter_sampled = True
+        #if self.resample_n_clutter and not self.n_clutter_sampled:
+        #    n_clutter = int((action / self.adversary_action_dim) * self.n_clutter)
+        #    self.adversary_max_steps = n_clutter + 2
+        #    self.n_clutter_sampled = True
 
-        if self.adversary_step_count < self.adversary_max_steps:
+        if state.time < params.n_walls:
             # Add offset of 1 for outside walls
-            x = int(action % (self.width - 2)) + 1
-            y = int(action / (self.width - 2)) + 1
+            x = int(action % (params.width - 2)) + 1
+            y = int(action / (params.width - 2)) + 1
             done = False
 
             # if self.choose_goal_last:
             #  should_choose_goal = self.adversary_step_count == self.adversary_max_steps - 2
             #  should_choose_agent = self.adversary_step_count == self.adversary_max_steps - 1
             # else:
-            should_choose_goal = self.adversary_step_count == 0
-            should_choose_agent = self.adversary_step_count == 2
-            should_choose_box = self.adversary_step_count == 1
+            should_choose_goal = state.time == params.n_walls-3
+            should_choose_agent = state.time == params.n_walls-2
+            should_choose_box = state.time == params.n_walls-1
             # print(f"{self.adversary_step_count}/{self.adversary_max_steps}", flush=True)
             # print(f"goal/agent = {should_choose_goal}/{should_choose_agent}", flush=True)
 
             # Place goal
             if should_choose_goal:
                 # If there is goal noise, sometimes randomly place the goal
-                self.game_start_room[x][y] = jnp.zeros(7)  # Remove any walls that might be in this loc
-                self.game_start_room[x][y][FieldStates.box_target] = 1
+                state.maze_map[x][y] = jnp.zeros(7)  # Remove any walls that might be in this loc
+                state.maze_map[x][y][FieldStates.box_target] = 1
 
             # Place the agent
             elif should_choose_agent:
-                self.game_start_room[x][y] = jnp.zeros(7)
-                self.game_start_room[x][y][FieldStates.player] = 1
+                state.maze_map[x][y] = jnp.zeros(7)
+                state.maze_map[x][y][FieldStates.player] = 1
 
             elif should_choose_box:
-                self.game_start_room[x][y] = jnp.zeros(7)
-                self.game_start_room[x][y][FieldStates.box] = 1
+                state.maze_map[x][y] = jnp.zeros(7)
+                state.maze_map[x][y][FieldStates.box] = 1
+                state.unmatched_boxes+=1
 
             # Place wall
-            elif self.adversary_step_count < self.adversary_max_steps:
+            elif state.time < params.n_walls:
                 # If there is already an object there, action does nothing
-                if self.game_start_room[x][y][FieldStates.empty] == 1:
-                    self.room[x][y][FieldStates.empty] = 0
-                    self.room[x][y][FieldStates.wall] = 0
-                    self.n_clutter_placed += 1
+                if state.maze_map[x][y][FieldStates.empty] == 1:
+                    state.maze_map[x][y][FieldStates.empty] = 0
+                    state.maze_map[x][y][FieldStates.wall] = 0
+                    #self.n_clutter_placed += 1
 
-        self.adversary_step_count += 1
+        state.time += 1 #self.adversary_step_count += 1
 
         # End of episode
-        if self.adversary_step_count >= self.n_clutter + 3:
+        if state.time >= params.n_walls + 3:
             done = True
             self.reset_metrics()
             self.compute_metrics()
         else:
             done = False
-
-        image = self.render()
-        obs = {
-            "image": image,
-            "time_step": [self.adversary_step_count],
-            "random_z": self.generate_random_z(),
-        }
+        #@TODO repair render
+        obs = self.get_obs(state)
         return (
             lax.stop_gradient(obs),
             lax.stop_gradient(state),
