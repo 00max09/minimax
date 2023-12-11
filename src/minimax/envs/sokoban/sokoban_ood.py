@@ -81,7 +81,7 @@ class SokobanSingleton(Sokoban):
         return self.get_obs(state), state
         
 
-class SixteenRooms(SokobanSingleton):
+class TwoRooms(SokobanSingleton):
     def __init__(
         self, 
         normalize_obs=False):
@@ -114,3 +114,10 @@ class SixteenRooms(SokobanSingleton):
             room[5][z][FieldStates.wall] = 1
         return room
 
+
+if hasattr(__loader__, 'name'):
+  module_path = __loader__.name
+elif hasattr(__loader__, 'fullname'):
+  module_path = __loader__.fullname
+
+register(env_id='Sokoban-TwoRooms', entry_point=module_path + ':TwoRooms')
