@@ -131,8 +131,91 @@ def _get_env_info_maze_ued(p):
 
 	return f"{p.env_name}{p.maze_height}x{p.maze_width}w{p.maze_n_walls}{info}"
 
+def _get_env_info_sokoban(p):
+	#see_agent = 'na' if not p.maze_see_agent else ''
+
+	#placement_info = ""
+	#if p.maze_replace_wall_pos:
+	#	placement_info = f'f'
+	#if p.maze_sample_n_walls:
+	#	placement_info = f"{placement_info}s"
+	#if len(placement_info) > 0:
+	#	placement_info = f"_{placement_info}"
+
+	return f"{p.env_name}{p.sokoban_height}x{p.sokoban_width}w{p.sokoban_n_walls}"
+
+
+def _get_env_info_sokoban_ued(p):
+	#see_agent = 'na' if not p.maze_see_agent else ''
+
+	info = ""#f"_{see_agent}_ld{p.maze_ued_noise_dim}"
+
+#	placement_info = ""
+	#if p.maze_ued_fixed_n_wall_steps:
+	#	placement_info = f"f"
+	#if p.maze_ued_replace_wall_pos:
+#		placement_info = f"{placement_info}r"
+#	if p.maze_ued_set_agent_dir:
+#		placement_info = f"{placement_info}d"
+#	if p.maze_ued_first_wall_pos_sets_budget:
+#		placement_info = f"{placement_info}b"
+#	if len(placement_info) > 0:
+#		placement_info = f"_{placement_info}"
+#	info = f"{info}{placement_info}"
+
+	return f"{p.env_name}{p.sokoban_height}x{p.sokoban_width}w{p.sokoban_n_walls}{info}"
+
+
 
 def _get_model_info_maze_default(p, role):
+	model_info = ''
+	if f'{role}_recurrent_arch' in p and p[f'{role}_recurrent_arch'] is not None:
+		model_info = f"{p[f'{role}_recurrent_arch']}_h{p[f'{role}_recurrent_hidden_dim']}"
+
+		if p[f'{role}_recurrent_arch'] == 's5':
+			model_info = f"{model_info}nb{p.get(f'{role}_s5_n_blocks', 1)}nl{p.get(f'{role}_s5_n_layers',4)}"
+
+			activation = p.get(f'{role}_s5_activation')
+			if activation == 'half_glu1':
+				activation = 'hg1'
+			elif activation == 'half_glu2':
+				activation = 'hg2'
+			elif activation == 'full_glu':
+				activation = 'fg'
+			elif activation == 'gelu':
+				activation = 'g'
+			else:
+				activation = 'hg1'
+			model_info = f'a{activation}_{model_info}'
+
+			ln_key =  f'{role}_s5_layernorm_pos'
+			ln_info = None
+			if ln_key in p:
+				ln = p[ln_key]
+				if ln == 'pre':
+					ln_info = 'pr'
+				elif ln == 'post':
+					ln_info = 'po'
+
+			if ln_info is not None:
+				model_info = f"l{ln_info}_{model_info}"
+
+
+	model_info = f'_{model_info}' if len(model_info) > 0 else ''
+
+	value_info = ''
+	value_ensemble_key = f'{role}_value_ensemble_size'
+	value_ensemble_size = p.get(value_ensemble_key)
+	if value_ensemble_size and value_ensemble_size > 1:
+		value_info = f've{value_ensemble_size}'
+
+	base_activation = p.get(f'{role}_base_activation', 'relu')[:2]
+
+	model_info = f"h{p[f'{role}_hidden_dim']}cf{p[f'{role}_n_conv_filters']}fc{p[f'{role}_n_hidden_layers']}se{p[f'{role}_scalar_embed_dim']}ba_{base_activation}{model_info}{value_info}"
+
+	return model_info
+
+def _get_model_info_sokoban_default(p, role):
 	model_info = ''
 	if f'{role}_recurrent_arch' in p and p[f'{role}_recurrent_arch'] is not None:
 		model_info = f"{p[f'{role}_recurrent_arch']}_h{p[f'{role}_recurrent_hidden_dim']}"
@@ -221,6 +304,8 @@ RUNNER_INFO_HANDLERS = {
 ENV_INFO_HANDLERS = {
 	'maze': _get_env_info_maze,
 	'maze_ued': _get_env_info_maze_ued,
+	'sokoban': _get_env_info_sokoban,
+	'sokoban_ued': _get_env_info_sokoban_ued
 }
 
 MODEL_INFO_HANDLERS = {
@@ -228,6 +313,10 @@ MODEL_INFO_HANDLERS = {
 		'default_student_cnn': partial(_get_model_info_maze_default, role='student'),
 		'default_teacher_cnn': partial(_get_model_info_maze_default, role='teacher'),
 	},
+	'sokoban': {
+		'default_student_cnn': partial(_get_model_info_sokoban_default, role='student'),
+		'default_teacher_cnn': partial(_get_model_info_sokoban_default, role='teacher'),
+	}
 }
 
 ALGO_INFO_HANDLERS = {
@@ -253,7 +342,6 @@ def get_model_info(p, role='student'):
 	if model_name is None:
 		model_name = p['student_model_name']
 	env_name = p.env_name.lower().split('-')[0]
-
 	return MODEL_INFO_HANDLERS[env_name][model_name](p)
 
 def get_algo_info(p, role='student'):

@@ -56,18 +56,11 @@
         "student_n_conv_filters": [16],
         "student_n_scalar_embeddings": [4],
         "student_scalar_embed_dim": [5],
-        "maze_height": [13],
-        "maze_width": [13],
-        "maze_n_walls": [0],
-        "maze_replace_wall_pos": [true],
-        "maze_sample_n_walls": [false],
-        "maze_see_agent": [false],
-        "maze_normalize_obs": [true],
-        "maze_obs_agent_pos": [false],
-        "maze_max_episode_steps": [250],
+        "sokoban_height": [10],
+        "sokoban_width": [10],
+        "sokoban_n_walls": [0],
+        "sokoban_max_episode_steps": [250],
         "test_n_episodes": [10],
-        "test_env_names": ["Sokoban-TwoRooms"],
-        "maze_test_see_agent": [false],
-        "maze_test_normalize_obs": [true]
+        "test_env_names": ["Sokoban-TwoRooms"]
     }
 }

@@ -468,6 +468,82 @@ student_maze_model_parser.add_argument(
     choices=["half_glu1", "half_glu2", "full_glu", "gelu"],
     help='Number of S5 encoder layers.')
 
+# ---- Maze args for student model ----
+student_sokoban_model_parser = parser.add_subparser(
+    name='student_sokoban_model',
+    prefix='student',
+    dest="student_model",
+    dependency={'env_name': 'Sokoban'})
+student_sokoban_model_parser.add_argument(
+    '--recurrent_arch',
+    type=str,
+    default=None,
+    nargs='?',
+    choices=['gru', 'lstm', 's5'],
+    help='Student RNN architecture.')
+student_sokoban_model_parser.add_argument(
+    '--recurrent_hidden_dim',
+    type=int,
+    default=0,
+    help='Student recurrent hidden state size.')
+student_sokoban_model_parser.add_argument(
+    '--hidden_dim',
+    type=int,
+    default=32,
+    help='Student hidden dimension.')
+student_sokoban_model_parser.add_argument(
+    '--n_hidden_layers',
+    type=int,
+    default=1,
+    help='Student number of hidden layers in policy/value heads.')
+student_sokoban_model_parser.add_argument(
+    '--n_conv_filters',
+    type=int,
+    default=16,
+    help='Number of CNN filters for student.')
+student_sokoban_model_parser.add_argument(
+    '--n_scalar_embeddings',
+    type=int,
+    default=4,
+    help='Defaults to 4 directional embeddings.')
+student_sokoban_model_parser.add_argument(
+    '--scalar_embed_dim',
+    type=int,
+    default=5,
+    help='Dimensionality of scalar direction embeddings.')
+student_sokoban_model_parser.add_argument(
+    '--base_activation',
+    type=str,
+    default='relu',
+    choices=['relu', 'gelu', 'crelu', 'leaky_relu'],
+    help='Nonlinearity for intermediate layers.')
+student_sokoban_model_parser.add_argument(
+    '--value_ensemble_size',
+    type=int,
+    default=1,
+    help='Size of value ensemble. Defaults to 1 (no ensemble).')
+student_sokoban_model_parser.add_argument(
+    '--s5_n_blocks',
+    type=int,
+    default=1,
+    help='Number of S5 blocks.')
+student_sokoban_model_parser.add_argument(
+    '--s5_n_layers',
+    type=int,
+    default=4,
+    help='Number of S5 encoder layers.')
+student_sokoban_model_parser.add_argument(
+    '--s5_layernorm_pos',
+    type=str,
+    default=None,
+    help='Layernorm pos in S5.')
+student_sokoban_model_parser.add_argument(
+    '--s5_activation',
+    type=str,
+    default="half_glu1",
+    choices=["half_glu1", "half_glu2", "full_glu", "gelu"],
+    help='Number of S5 encoder layers.')
+
 
 # ==== Teacher model arguments.
 parser.add_dependent_argument(
@@ -549,6 +625,71 @@ teacher_maze_model_parser.add_argument(
     choices=["half_glu1", "half_glu2", "full_glu", "gelu"],
     help='Number of S5 encoder layers.')
 
+teacher_sokoban_model_parser = parser.add_subparser(
+    name='teacher_sokoban_model',
+    prefix='teacher',
+    dest="teacher_model",
+    dependency={'train_runner': 'paired', 'env_name': 'Sokoban'})
+teacher_sokoban_model_parser.add_argument(
+    '--recurrent_arch',
+    type=str,
+    default=None,
+    nargs='?',
+    choices=['gru', 'lstm', 's5'],
+    help='Teacher RNN architecture.')
+teacher_sokoban_model_parser.add_argument(
+    '--recurrent_hidden_dim',
+    type=int,
+    default=0,
+    help='Teacher recurrent hidden state size.')
+teacher_sokoban_model_parser.add_argument(
+    '--hidden_dim',
+    type=int,
+    default=32,
+    help='Teacher hidden dimension.')
+teacher_sokoban_model_parser.add_argument(
+    '--n_hidden_layers',
+    type=int,
+    default=1,
+    help='Teacher number of hidden layers in policy/value heads.')
+teacher_sokoban_model_parser.add_argument(
+    '--n_conv_filters',
+    type=int,
+    default=128,
+    help='Number of CNN filters for teacher.')
+teacher_sokoban_model_parser.add_argument(
+    '--scalar_embed_dim',
+    type=int,
+    default=10,
+    help='Dimensionality of time-step embeddings.')
+teacher_sokoban_model_parser.add_argument(
+    '--base_activation',
+    type=str,
+    default='relu',
+    choices=['relu', 'gelu', 'crelu', 'leaky_relu'],
+    help='Nonlinearity for intermediate layers.')
+teacher_sokoban_model_parser.add_argument(
+    '--s5_n_blocks',
+    type=int,
+    default=1,
+    help='Number of S5 blocks.')
+teacher_sokoban_model_parser.add_argument(
+    '--s5_n_layers',
+    type=int,
+    default=4,
+    help='Number of S5 encoder layers.')
+teacher_sokoban_model_parser.add_argument(
+    '--s5_layernorm_pos',
+    type=str,
+    default=None,
+    help='Layernorm pos in S5.')
+teacher_sokoban_model_parser.add_argument(
+    '--s5_activation',
+    type=str,
+    default="half_glu1",
+    choices=["half_glu1", "half_glu2", "full_glu", "gelu"],
+    help='Number of S5 encoder layers.')
+
 
 # ==== Environment arguments.
 parser.add_argument(
@@ -578,7 +719,7 @@ env_maze_parser.add_argument(
 env_maze_parser.add_argument(
     '--width',
     type=int,
-    default=13,
+    default=19,
     help='Width of training mazes.')
 env_maze_parser.add_argument(
     '--n_walls',
@@ -684,6 +825,41 @@ maze_ued_parser.add_argument(
     default=True,
     help='Normalize teacher observations.')
 
+# -------- Sokoban --------
+env_sokoban_parser = parser.add_subparser(
+    name='sokoban',
+    prefix='sokoban',
+    dependency={'env_name': ['Sokoban']},
+    dest='env')
+env_sokoban_parser.add_argument(
+    '--height',
+    type=int,
+    default=13,
+    help='Height of training sokoban.')
+env_sokoban_parser.add_argument(
+    '--width',
+    type=int,
+    default=13,
+    help='Width of training sokoban.')
+env_sokoban_parser.add_argument(
+    '--n_walls',
+    type=int,
+    default=25,
+    help='Maximum number of walls in training sokoban.')
+#env_maze_parser.add_argument(
+#    '--replace_wall_pos',
+#    type=str2bool, 
+#    nargs='?', 
+#    const=True, 
+#    default=False,
+#    help='Sample wall positions with replacement.')
+env_sokoban_parser.add_argument(
+    '--sample_n_walls',
+    type=str2bool, 
+    nargs='?', 
+    const=True, 
+    default=False,
+    help='Uniformly sample n_walls between 0 and n_walls.')
 
 # Logging arguments (All top-level arguments.).
 parser.add_argument(

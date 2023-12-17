@@ -57,7 +57,8 @@ class EnvParams:
 class Sokoban(environment.Environment):
     def __init__(
         self,
-        dim_room=(10, 10),
+        height=10,
+        width=10,
         max_steps=jnp.inf,
         num_boxes=4,
         num_gen_steps=None,
@@ -72,12 +73,12 @@ class Sokoban(environment.Environment):
     ):
         
         super().__init__()
-        self.obs_shape = (self.dim_room[0], self.dim_room[1], 7)
+        self.obs_shape = (height, width, 7)
         self.action_set = jnp.array([Actions.left, Actions.right, Actions.up, Actions.down])
 
         self.params = EnvParams(
-            height=dim_room[0],
-            width=dim_room[1],
+            height=height,
+            width=width,
             #replace_wall_pos=replace_wall_pos and not sample_n_walls,
             mode = mode,
             max_episode_steps = max_steps,
