@@ -773,6 +773,39 @@ env_maze_all_parser.add_argument(
     default=250,
     help='Maximum number of steps in training episodes.')
 
+
+env_sokoban_all_parser = parser.add_subparser(
+    name='sokoban_all',
+    prefix='sokoban',
+    dependency={'env_name': 'Sokoban*'},
+    dest='env')
+# env_sokoban_all_parser.add_argument(
+#     '--see_agent',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=True,
+#     help='Whether the agent sees itself in observations.')
+# env_sokoban_all_parser.add_argument(
+#     '--normalize_obs',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=True,
+#     help='Ensure observations are between 0 and 1.')
+# env_sokoban_all_parser.add_argument(
+#     '--obs_agent_pos',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='Include agent xy pos in observations.')
+env_sokoban_all_parser.add_argument(
+    '--max_episode_steps',
+    type=int,
+    default=250,
+    help='Maximum number of steps in training episodes.')
+
 # -------- Maze UED --------
 maze_ued_parser = parser.add_subparser(
     name='maze_ued',
@@ -841,11 +874,11 @@ env_sokoban_parser.add_argument(
     type=int,
     default=13,
     help='Width of training sokoban.')
-env_sokoban_parser.add_argument(
-    '--n_walls',
-    type=int,
-    default=25,
-    help='Maximum number of walls in training sokoban.')
+# env_sokoban_parser.add_argument(
+#     '--n_walls',
+#     type=int,
+#     default=25,
+#     help='Maximum number of walls in training sokoban.')
 #env_maze_parser.add_argument(
 #    '--replace_wall_pos',
 #    type=str2bool, 
@@ -853,13 +886,69 @@ env_sokoban_parser.add_argument(
 #    const=True, 
 #    default=False,
 #    help='Sample wall positions with replacement.')
-env_sokoban_parser.add_argument(
-    '--sample_n_walls',
-    type=str2bool, 
-    nargs='?', 
-    const=True, 
-    default=False,
-    help='Uniformly sample n_walls between 0 and n_walls.')
+# env_sokoban_parser.add_argument(
+#     '--sample_n_walls',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='Uniformly sample n_walls between 0 and n_walls.')
+
+# -------- Sokoban UED --------
+sokoban_ued_parser = parser.add_subparser(
+    name='sokoban_ued',
+    prefix='sokoban_ued',
+    dependency={'env_name': ['Sokoban']},
+    dest='ued_env')
+# sokoban_ued_parser.add_argument(
+#     '--replace_wall_pos',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='Teacher can sample same wall pos multiple times (resulting in variable n_walls).')
+# sokoban_ued_parser.add_argument(
+#     '--fixed_n_wall_steps',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='Teacher samples exactly n_walls wall positions for each level.')
+# sokoban_ued_parser.add_argument(
+#     '--first_wall_pos_sets_budget',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='The first wall positional index determines the wall budget.')
+# sokoban_ued_parser.add_argument(
+#     '--noise_dim',
+#     type=int,  
+#     default=50,
+#     help="Dimension of episodic noise vector injected into the teacher's observation.")
+sokoban_ued_parser.add_argument(
+    '--n_walls',
+    type=int,  
+    default=25,
+    help="Number walls the adversary can place.")
+# sokoban_ued_parser.add_argument(
+#     '--set_agent_dir',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=False,
+#     help='Teacher chooses the agent direction on last time step.')
+# sokoban_ued_parser.add_argument(
+#     '--normalize_obs',
+#     type=str2bool, 
+#     nargs='?', 
+#     const=True, 
+#     default=True,
+#     help='Normalize teacher observations.')
+
+
+
+
 
 # Logging arguments (All top-level arguments.).
 parser.add_argument(

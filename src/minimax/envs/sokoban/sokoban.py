@@ -59,7 +59,7 @@ class Sokoban(environment.Environment):
         self,
         height=10,
         width=10,
-        max_steps=jnp.inf,
+        max_episode_steps=jnp.inf,
         num_boxes=4,
         num_gen_steps=None,
         mode="one_hot",
@@ -69,6 +69,7 @@ class Sokoban(environment.Environment):
         # penalty_box_off_target=-1,
         reward_box_on_target=1,
         reward_finished=10,
+
         seed=None,
     ):
         
@@ -81,17 +82,17 @@ class Sokoban(environment.Environment):
             width=width,
             #replace_wall_pos=replace_wall_pos and not sample_n_walls,
             mode = mode,
-            max_episode_steps = max_steps,
+            max_episode_steps = max_episode_steps,
             num_boxes = num_boxes,
             #max_episode_steps=max_episode_steps,
             #normalize_obs=normalize_obs,
             #sample_n_walls=sample_n_walls,
             #obs_agent_pos=obs_agent_pos,
             singleton_seed=-1,
-            num_gen_steps = num_gen_steps,
-            penalty_for_step = penalty_for_step,
-            reward_box_on_target = reward_box_on_target,
-            reward_finished = reward_finished,
+            #num_gen_steps = num_gen_steps,
+            #penalty_for_step = penalty_for_step,
+            #reward_box_on_target = reward_box_on_target,
+            #reward_finished = reward_finished,
         )
         
         # Penalties and Rewards
@@ -371,43 +372,43 @@ def load_surfaces():
     return surfaces
 
 
-class HashableState:
-    state = jnp.random.get_state()
-    jnp.random.seed(0)
-    hash_key = jnp.random.normal(size=10000)
-    jnp.random.set_state(state)
+# class HashableState:
+#     state = jnp.random.get_state()
+#     jnp.random.seed(0)
+#     hash_key = jnp.random.normal(size=10000)
+#     jnp.random.set_state(state)
 
-    def __init__(self, one_hot, agent_pos, unmached_boxes, fast_eq=False):
-        self.one_hot = one_hot
-        self.agent_pos = agent_pos
-        self.unmached_boxes = unmached_boxes
-        self._hash = None
-        self.fast_eq = fast_eq
-        self._initial_state_hash = None
+#     def __init__(self, one_hot, agent_pos, unmached_boxes, fast_eq=False):
+#         self.one_hot = one_hot
+#         self.agent_pos = agent_pos
+#         self.unmached_boxes = unmached_boxes
+#         self._hash = None
+#         self.fast_eq = fast_eq
+#         self._initial_state_hash = None
 
-    def __iter__(self):
-        yield from [self.one_hot, self.agent_pos, self.unmached_boxes]
+#     def __iter__(self):
+#         yield from [self.one_hot, self.agent_pos, self.unmached_boxes]
 
-    def __hash__(self):
-        if self._hash is None:
-            flat_np = self.one_hot.flatten()
-            self._hash = int(jnp.dot(flat_np, HashableState.hash_key[:len(flat_np)]) * 10e8)
-        return self._hash
+#     def __hash__(self):
+#         if self._hash is None:
+#             flat_np = self.one_hot.flatten()
+#             self._hash = int(jnp.dot(flat_np, HashableState.hash_key[:len(flat_np)]) * 10e8)
+#         return self._hash
 
-    def __eq__(self, other):
-        if self.fast_eq:
-            return hash(self) == hash(other)  # This is a conscious decision to speed up.
-        else:
-            return jnp.array_equal(self.one_hot, other.one_hot)
+#     def __eq__(self, other):
+#         if self.fast_eq:
+#             return hash(self) == hash(other)  # This is a conscious decision to speed up.
+#         else:
+#             return jnp.array_equal(self.one_hot, other.one_hot)
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
+#     def __ne__(self, other):
+#         return not self.__eq__(other)
 
-    def get_raw(self):
-        return self.one_hot, self.agent_pos, self.unmached_boxes
+#     def get_raw(self):
+#         return self.one_hot, self.agent_pos, self.unmached_boxes
 
-    def get_np_array_version(self):
-        return self.one_hot
+#     def get_np_array_version(self):
+#         return self.one_hot
 
 # Register the env
 if hasattr(__loader__, 'name'):

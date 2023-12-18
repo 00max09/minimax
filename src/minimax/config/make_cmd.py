@@ -228,6 +228,7 @@ if __name__ == '__main__':
 		json_filename += '.json'
 
 	grid_path = os.path.join(os.path.expandvars(os.path.expanduser(args.dir)), json_filename)
+	print(grid_path)
 	config = json.load(open(grid_path))
 	print(config)
 	cmd = config.get('cmd', 'train')

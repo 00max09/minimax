@@ -58,7 +58,7 @@
         "student_scalar_embed_dim": [5],
         "sokoban_height": [10],
         "sokoban_width": [10],
-        "sokoban_n_walls": [0],
+        "sokoban_ued_n_walls": [0],
         "sokoban_max_episode_steps": [250],
         "test_n_episodes": [10],
         "test_env_names": ["Sokoban-TwoRooms"]

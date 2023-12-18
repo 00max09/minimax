@@ -7,6 +7,7 @@ LICENSE file in the root directory of this source tree.
 """
 
 from .maze import Maze, UEDMaze
+from .sokoban import Sokoban, UEDSokoban
 from .batch_env import BatchEnv
 from .batch_env_ued import BatchUEDEnv
 

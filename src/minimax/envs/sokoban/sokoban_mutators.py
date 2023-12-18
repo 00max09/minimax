@@ -13,7 +13,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from .common import make_maze_map
 from .sokoban import FieldStates
 from minimax.envs.registration import register_mutator
 
