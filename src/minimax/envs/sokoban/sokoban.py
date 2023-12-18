@@ -59,7 +59,7 @@ class Sokoban(environment.Environment):
         self,
         height=10,
         width=10,
-        max_episode_steps=jnp.inf,
+        max_episode_steps=250,
         num_boxes=4,
         num_gen_steps=None,
         mode="one_hot",
@@ -108,7 +108,12 @@ class Sokoban(environment.Environment):
         #self.initial_internal_state_hash = None
         #self.load_boards_from_file = load_boards_from_file
         #self.boards_from_file = None
-        
+    
+    @property
+    def default_params(self) -> EnvParams:
+        # Default environment parameters
+        return EnvParams()
+
     def step_env(self,
                  key: chex.PRNGKey,
                  state: EnvState,

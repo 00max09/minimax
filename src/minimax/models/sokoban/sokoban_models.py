@@ -269,8 +269,8 @@ elif hasattr(__loader__, 'fullname'):
 
 register(
 	env_group_id='Sokoban', model_id='default_student_cnn', 
-	entry_point=module_path + ':GridWorldACStudentModel')
+	entry_point=module_path + ':SokobanACStudentModel')
 
 register(
 	env_group_id='Sokoban', model_id='default_teacher_cnn', 
-	entry_point=module_path + ':GridWorldACTeacherModel')
+	entry_point=module_path + ':SokobanACTeacherModel')

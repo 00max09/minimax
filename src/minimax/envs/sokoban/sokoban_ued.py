@@ -173,6 +173,15 @@ class UEDSokoban(environment.Environment):
             {}
         )
 
+    @staticmethod
+    def align_kwargs(kwargs, other_kwargs):
+        kwargs.update(dict(
+            height=other_kwargs['height'],
+            width=other_kwargs['width'],
+        ))
+
+        return kwargs
+    
     def get_env_instance(
             self, 
             key: chex.PRNGKey,
