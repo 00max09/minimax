@@ -37,8 +37,8 @@ class SokobanSingleton(Sokoban):
         
     ):	
         super().__init__(
-            dim_room=dim_room,
-            max_steps=max_steps,
+            height=dim_room[0],
+            width=dim_room[1],
             num_boxes=num_boxes,
             num_gen_steps=num_gen_steps,
             mode=mode,
@@ -47,8 +47,6 @@ class SokobanSingleton(Sokoban):
             reward_box_on_target=reward_box_on_target,
             reward_finished=reward_finished,
             seed = seed,
-            load_boards_from_file=load_boards_from_file,
-            load_boards_lazy=load_boards_lazy
         )
 
         self.maze_map = maze_map
@@ -98,20 +96,20 @@ class TwoRooms(SokobanSingleton):
     def _gen_grid(self):
         # Create the grid
         room = jnp.zeros(shape = (10+2, 10+2, 7))
-        room[:][:][FieldStates.empty] = 1
+        room = room.at[:,:,FieldStates.empty].set(1)
         for i in range(10+2):
-            room[i][0][FieldStates.wall] = 1
-            room[i][10+1][FieldStates.wall] = 1
+            room = room.at[i, 0, FieldStates.wall].set(1)
+            room = room.at[i, 10+1, FieldStates.wall].set(1)
         for z in range(10+2):
-            room[0][z][FieldStates.wall] = 1
-            room[10+1][FieldStates.wall] = 1
-        room[2][2][FieldStates.player] = 1
-        room[3][3][FieldStates.box] = 1
-        room[9][9][FieldStates.box_target] = 1
+            room = room.at[0, z, FieldStates.wall].set(1)
+            room = room.at[10+1, z, FieldStates.wall].set(1)
+        room = room.at[2,2,FieldStates.player].set(1)
+        room = room.at[3,3,FieldStates.box].set(1)
+        room = room.at[9,9,FieldStates.box_target].set(1)
         for z in range(1,5) :
-            room[5][z][FieldStates.wall] = 1
+            room = room.at[5,z,FieldStates.wall].set(1)
         for z in range(6,10) :
-            room[5][z][FieldStates.wall] = 1
+            room.at[5,z,FieldStates.wall].set(1)
         return room
 
 

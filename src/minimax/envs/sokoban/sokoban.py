@@ -138,7 +138,28 @@ class Sokoban(environment.Environment):
         self,
         key: chex.PRNGKey
     ) -> Tuple[chex.Array, EnvState]:
-        assert False, "Not implemented yet, hopefully not needed" 
+        params = self.params
+        map_size = params.width * params.height
+        agent_box_end_poses = jax.random.permutation(key, map_size)
+        room = jax.random.randint(key, (params.height, params.width), 0, 2)
+        agent_pos = (agent_box_end_poses[0]//params.width, agent_box_end_poses[0]%params.width)
+        box_pos = (agent_box_end_poses[1]//params.width, agent_box_end_poses[1]%params.width)
+        end_pos = (agent_box_end_poses[2]//params.width, agent_box_end_poses[2]%params.width)
+        
+        room = room.at[agent_pos].set(FieldStates.player)
+        room = room.at[box_pos].set(FieldStates.box)
+        room = room.at[end_pos].set(FieldStates.box_target)
+        room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(room.shape + (7,))
+        
+        state = EnvState(
+            agent_pos=agent_pos,
+            maze_map=room,
+            start_map=room,
+            time=0,
+            terminal=False,
+            unmatched_boxes=1
+        )
+        return self.get_obs(state), state
     
     def set_env_instance(
             self,  
