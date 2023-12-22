@@ -211,63 +211,81 @@ class Sokoban(environment.Environment):
         player_target = 6
 
         delta_x, delta_y = None, None
-        if action == 0:
-            delta_x, delta_y = -1, 0
-        elif action == 1:
-            delta_x, delta_y = 1, 0
-        elif action == 2:
-            delta_x, delta_y = 0, -1
-        elif action == 3:
-            delta_x, delta_y = 0, 1
+
+        delta_x = (action < 2) * (2 * action -1)
+
+        delta_y = (action >= 2) * (2 * action - 5)
+        # if action == 0:
+        #     delta_x, delta_y = -1, 0
+        # elif action == 1:
+        #     delta_x, delta_y = 1, 0
+        # elif action == 2:
+        #     delta_x, delta_y = 0, -1
+        # elif action == 3:
+        #     delta_x, delta_y = 0, 1
 
         one_hot = state.maze_map
         agent_pos = state.agent_pos
         unmatched_boxes = state.unmatched_boxes
 
         arena = jnp.zeros(shape=(3,), dtype=jnp.uint8)
+         
         for i in range(3):
             index_x = agent_pos[0] + i * delta_x
             index_y = agent_pos[1] + i * delta_y
-            if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
-                arena[i] = jnp.where(one_hot[index_x, index_y, :] == 1)[0][0]
+            is_in_place = jnp.logical_and(index_x < one_hot.shape[0],index_y < one_hot.shape[0])
+            arena.at[i].set(_find_pos(one_hot, index_x, index_y))
 
         new_unmatched_boxes_ = unmatched_boxes
         new_agent_pos = agent_pos
         new_arena = jnp.copy(arena)
 
-        box_moves = (arena[1] == box or arena[1] == box_target) and \
-                    (arena[2] == empty or arena[2] == 2)
+        box_moves = jnp.logical_and(jnp.logical_or(arena[1] == box,arena[1] == box_target),
+                                    jnp.logical_or(arena[2] == empty, arena[2] == 2))
 
-        agent_moves = arena[1] == empty or arena[1] == target or box_moves
+        agent_moves = jnp.logical_or(arena[1] == empty,jnp.logical_or(arena[1] == target,box_moves))
 
-        if agent_moves:
+        def _move_agent(_):
             targets = (arena == target).astype(jnp.int8) + \
                       (arena == box_target).astype(jnp.int8) + \
                       (arena == player_target).astype(jnp.int8)
-            if box_moves:
-                last_field = box - 2 * targets[2]  # Weirdness due to inconsistent target non-target
-            else:
-                last_field = arena[2] - targets[2]
-
+            last_field = jax.lax.cond(box_moves, lambda _: box - 2 * targets[2], lambda _:(arena[2] - targets[2]).astype(jnp.int8), None)
             new_arena = jnp.array([empty, player, last_field]).astype(jnp.uint8) + targets.astype(jnp.uint8)
             new_agent_pos = (agent_pos[0] + delta_x, agent_pos[1] + delta_y)
+            new_unmatched_boxes2 = jax.lax.cond(box_moves, lambda _: (unmatched_boxes - (targets[2] - targets[1])).astype(int), lambda _:new_unmatched_boxes_, None )
+            return new_arena, new_agent_pos, new_unmatched_boxes2
 
-            if box_moves:
-                new_unmatched_boxes_ = int(unmatched_boxes - (targets[2] - targets[1]))
+        #return new_one_hot, new_agent_pos, new_unmatched_boxes_, done, reward
+        new_arena, new_agent_pos, new_unmatched_boxes_ = \
+            jax.lax.cond(agent_moves, _move_agent, lambda *x: (new_arena, new_agent_pos, new_unmatched_boxes_), None )
+
+            # targets = (arena == target).astype(jnp.int8) + \
+            #           (arena == box_target).astype(jnp.int8) + \
+            #           (arena == player_target).astype(jnp.int8)
+            # if box_moves:
+            #     last_field = box - 2 * targets[2]  # Weirdness due to inconsistent target non-target
+            # else:
+            #     last_field = arena[2] - targets[2]
+
+            # new_arena = jnp.array([empty, player, last_field]).astype(jnp.uint8) + targets.astype(jnp.uint8)
+            # new_agent_pos = (agent_pos[0] + delta_x, agent_pos[1] + delta_y)
+
+            # if box_moves:
+            #     new_unmatched_boxes_ = int(unmatched_boxes - (targets[2] - targets[1]))
 
         new_one_hot = jnp.copy(one_hot)
         for i in range(3):
             index_x = agent_pos[0] + i * delta_x
             index_y = agent_pos[1] + i * delta_y
-            if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
-                one_hot_field = jnp.zeros(shape=7)
-                one_hot_field[new_arena[i]] = 1
-                new_one_hot[index_x, index_y, :] = one_hot_field
+            
+            #if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
+            one_hot_field = jnp.zeros(shape=7)
+            one_hot_field.at[new_arena[i]].set(1)
+            new_one_hot.at[index_x, index_y, :].set(one_hot_field, mode = 'drop')
 
         done = (new_unmatched_boxes_ == 0)
-        reward = params.penalty_for_step - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
-        if done:
-            reward += params.reward_finished
+        reward = 0.1 - 1*((float(new_unmatched_boxes_) - float(unmatched_boxes))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
+        reward += params.reward_finished * done
 
         return (
             state.replace(
@@ -444,3 +462,5 @@ elif hasattr(__loader__, 'fullname'):
 
 register(env_id='Sokoban', entry_point=module_path + ':Sokoban')
 
+def _find_pos (one_hot : chex.Array, x: int, y: int) -> int:
+    return jnp.where(one_hot[x, y, :] == 1, size = 1, fill_value=0)[0][0]

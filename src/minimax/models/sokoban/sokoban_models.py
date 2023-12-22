@@ -174,7 +174,7 @@ class SokobanACStudentModel(SokobanBasicModel):
 		"""
 		old_x = x
 		img = x['image']
-		agent_dir = x['agent_dir']
+		#agent_dir = x['agent_dir']
 		aux = x.get('aux')
 
 		if self.rnn is not None:
@@ -184,12 +184,12 @@ class SokobanACStudentModel(SokobanBasicModel):
 			batch_dims = img.shape[:1]
 			x = self.conv(img).reshape(*batch_dims, -1)
 
-		if self.fc_scalar is not None:
-			if self.n_scalar_embeddings == 0:
-				agent_dir /= self.max_scalar
+		#if self.fc_scalar is not None:
+			#if self.n_scalar_embeddings == 0:
+			#	agent_dir /= self.max_scalar
 
-			scalar_emb = self.fc_scalar(agent_dir).reshape(*batch_dims, -1)
-			x = jnp.concatenate([x, scalar_emb], axis=-1)
+			#scalar_emb = self.fc_scalar(agent_dir).reshape(*batch_dims, -1)
+			#x = jnp.concatenate([x, scalar_emb], axis=-1)
 
 		if aux is not None:
 			x = jnp.concatenate([x, aux], axis=-1)
