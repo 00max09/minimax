@@ -24,7 +24,6 @@ class SokobanSingleton(Sokoban):
         max_steps=jnp.inf,
         num_boxes=4,
         num_gen_steps=None,
-        mode="one_hot",
         fast_state_eq=False,
         penalty_for_step=-0.1,
         # currently penalty_box_off_target is implicitly = - reward_box_on_target
@@ -41,7 +40,6 @@ class SokobanSingleton(Sokoban):
             width=dim_room[1],
             num_boxes=num_boxes,
             num_gen_steps=num_gen_steps,
-            mode=mode,
             fast_state_eq=fast_state_eq,
             penalty_for_step=penalty_for_step,
             reward_box_on_target=reward_box_on_target,

@@ -143,8 +143,8 @@ def basic_soko_mut(rng, params, state, n=1):
         return state
     start_map=state.start_map
     num_tiles = params.width*params.height
-    edit_locs = list(set(jnp.random.randint(rng, 0, num_tiles,n)))
-    actions = jnp.random.randint(rng, 0, 1, len(edit_locs))
+    edit_locs = list(set(jax.random.randint(rng, (n,), 0, num_tiles)))
+    actions = jax.random.randint(rng, (n, ), 0, 1)
 
     free_mask = start_map[:][:]
     #free_mask[self.agent_start_pos[1]-1, self.agent_start_pos[0]-1] = False
@@ -154,12 +154,17 @@ def basic_soko_mut(rng, params, state, n=1):
       x = loc % (params.width - 2) + 1
       y = loc // (params.width - 2) + 1
 
-      if(start_map[x][y][FieldStates.wall] == 1) :
-        start_map[x][y][FieldStates.wall] = 0
-        start_map[x][y][FieldStates.empty] = 1
-      elif (start_map[x][y][FieldStates.empty] == 1):
-        start_map[x][y][FieldStates.wall] = 1
-        start_map[x][y][FieldStates.empty] = 0
+      wall_val = start_map[x][y][FieldStates.wall]
+      empty_val = start_map[x][y][FieldStates.empty]
+      start_map.at[x,y,FieldStates.wall].set(empty_val)
+      start_map.at[x,y,FieldStates.empty].set(wall_val)
+       
+      # if(start_map[x][y][FieldStates.wall] == 1) :
+      #   start_map.at[x,y,FieldStates.wall].set(0)
+      #   start_map.at[x,y,FieldStates.empty].set(1)
+      # elif (start_map[x][y][FieldStates.empty] == 1):
+      #   start_map.at[x,y,FieldStates.wall].set(1)
+      #   start_map.at[x,y,FieldStates.empty].set(0)
 
     
      

@@ -51,7 +51,6 @@ class EnvParams:
     replace_wall_pos: bool = False
     max_episode_steps: int = 250
     singleton_seed: int = -1
-    mode: str = "one_hot"
     num_boxes: int = 4
 
 class Sokoban(environment.Environment):
@@ -62,7 +61,6 @@ class Sokoban(environment.Environment):
         max_episode_steps=250,
         num_boxes=4,
         num_gen_steps=None,
-        mode="one_hot",
         fast_state_eq=False,
         penalty_for_step=-0.1,
         # currently penalty_box_off_target is implicitly = - reward_box_on_target
@@ -81,7 +79,6 @@ class Sokoban(environment.Environment):
             height=height,
             width=width,
             #replace_wall_pos=replace_wall_pos and not sample_n_walls,
-            mode = mode,
             max_episode_steps = max_episode_steps,
             num_boxes = num_boxes,
             #max_episode_steps=max_episode_steps,
@@ -284,12 +281,12 @@ class Sokoban(environment.Environment):
             new_one_hot.at[index_x, index_y, :].set(one_hot_field, mode = 'drop')
 
         done = (new_unmatched_boxes_ == 0)
-        reward = 0.1 - 1*((float(new_unmatched_boxes_) - float(unmatched_boxes))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
-        reward += params.reward_finished * done
+        reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
+        reward += 10 * done
 
         return (
             state.replace(
-                act_map = new_one_hot,
+                maze_map = new_one_hot,
                 agent_pos=new_agent_pos,
                 unmatched_boxes = new_unmatched_boxes_,
                 terminal = done),
@@ -360,9 +357,10 @@ class Sokoban(environment.Environment):
         #     state.wall_map,
         #     state.agent_pos,
         #     state.goal_pos
-        # )
-
+        # 
+        n_walls = jnp.sum(state.maze_map[:][ :][FieldStates.wall])
         return dict(
+            n_wall = n_walls
             #n_walls=n_walls,
         #    shortest_path_length=shortest_path_length,
          #   passable=shortest_path_length > 0,
