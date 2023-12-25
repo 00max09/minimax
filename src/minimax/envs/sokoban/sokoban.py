@@ -14,7 +14,8 @@ from collections import namedtuple, OrderedDict
 from typing import Tuple, Optional
 
 from .common import (
-    EnvInstance)
+    EnvInstance,
+    render)
 
 
 class Actions(IntEnum):
@@ -186,7 +187,7 @@ class Sokoban(environment.Environment):
     def get_obs(self, state: EnvState) -> chex.Array:
         """Return grid view."""
     
-        image = state.maze_map.astype(jnp.uint8)
+        image = render(self.params,state.maze_map).astype(jnp.uint8)
         #if self.params.normalize_obs:
         #    image = image/10.0
 
@@ -371,47 +372,47 @@ class Sokoban(environment.Environment):
     #     starting_observation = self.render()
     #     return starting_observation
         
-    def render(self, mode='one_hot'):
-        assert mode in RENDERING_MODES, f"Only {RENDERING_MODES} are supported, not {mode}"
-        if mode == 'one_hot':
-            return self._internal_state.one_hot
-        render_surfaces = None
-        if mode == 'rgb_array':
-            render_surfaces = self._surfaces['16x16pixels']
-        if mode == 'tiny_rgb_array':
-            render_surfaces = self._surfaces['8x8pixels']
+    # def render(self, mode='one_hot'):
+    #     assert mode in RENDERING_MODES, f"Only {RENDERING_MODES} are supported, not {mode}"
+    #     if mode == 'one_hot':
+    #         return self._internal_state.one_hot
+    #     render_surfaces = None
+    #     if mode == 'rgb_array':
+    #         render_surfaces = self._surfaces['16x16pixels']
+    #     if mode == 'tiny_rgb_array':
+    #         render_surfaces = self._surfaces['8x8pixels']
 
-        size_x = self._internal_state.one_hot.shape[0]*render_surfaces.shape[1]
-        size_y = self._internal_state.one_hot.shape[1]*render_surfaces.shape[2]
+    #     size_x = self._internal_state.one_hot.shape[0]*render_surfaces.shape[1]
+    #     size_y = self._internal_state.one_hot.shape[1]*render_surfaces.shape[2]
 
-        res = jnp.tensordot(self._internal_state.one_hot, render_surfaces, (-1, 0))
-        res = jnp.transpose(res, (0, 2, 1, 3, 4))
-        res = jnp.reshape(res, (size_x, size_y, 3))
-        return res
+    #     res = jnp.tensordot(self._internal_state.one_hot, render_surfaces, (-1, 0))
+    #     res = jnp.transpose(res, (0, 2, 1, 3, 4))
+    #     res = jnp.reshape(res, (size_x, size_y, 3))
+    #     return res
 
     
 
 
 
-def load_surfaces():
+# def load_surfaces():
 
-    # Necessarily keep the same order as in FieldStates
-    assets_file_name = ['wall.png', 'floor.png', 'box_target.png', 'box_on_target.png',
-                        'box.png', 'player.png', 'player_on_target.png']
-    sizes = ['8x8pixels', '16x16pixels']
+#     # Necessarily keep the same order as in FieldStates
+#     assets_file_name = ['wall.png', 'floor.png', 'box_target.png', 'box_on_target.png',
+#                         'box.png', 'player.png', 'player_on_target.png']
+#     sizes = ['8x8pixels', '16x16pixels']
 
-    resource_package = __name__
-    surfaces = {}
-    for size in sizes:
-        surfaces[size] = []
-        for asset_file_name in assets_file_name:
-            asset_path = pkg_resources.resource_filename(resource_package, '/'.join(('surface', size, asset_file_name)))
-            asset_np_array = jnp.array(Image.open(asset_path))
-            surfaces[size].append(asset_np_array)
+#     resource_package = __name__
+#     surfaces = {}
+#     for size in sizes:
+#         surfaces[size] = []
+#         for asset_file_name in assets_file_name:
+#             asset_path = pkg_resources.resource_filename(resource_package, '/'.join(('surface', size, asset_file_name)))
+#             asset_np_array = jnp.array(Image.open(asset_path))
+#             surfaces[size].append(asset_np_array)
 
-        surfaces[size] = jnp.stack(surfaces[size])
+#         surfaces[size] = jnp.stack(surfaces[size])
 
-    return surfaces
+#     return surfaces
 
 
 # class HashableState:
