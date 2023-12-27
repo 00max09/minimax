@@ -26,12 +26,12 @@ class SokobanBasicModel(nn.Module):
 	n_hidden_layers: int = 1
 	hidden_dim: int = 32
 	n_conv_filters: int = 16
-	conv_kernel_size: int = 7
+	conv_kernel_size: int = 3
 	n_scalar_embeddings: int = 4
 	max_scalar: int = 4
 	scalar_embed_dim: int = 5
 	recurrent_arch: str = None
-	recurrent_hidden_dim: int = 400
+	recurrent_hidden_dim: int = 256
 	base_activation: str = 'relu'
 	head_activation: str = 'tanh'
 
@@ -43,8 +43,6 @@ class SokobanBasicModel(nn.Module):
 	value_ensemble_size: int = 1
 
 	def setup(self):
-		print([self.conv_kernel_size,]*2)
-		print("this are kernel sizes")
 		self.conv = nn.Sequential([
 			nn.Conv(
 				features=self.n_conv_filters, 
@@ -142,7 +140,7 @@ class SokobanBasicModel(nn.Module):
 		else:
 			self.v_head = common.ValueHead(**value_head_kwargs)
 		
-		print(vars(self))
+	
 
 	def __call__(self, x, carry=None):
 		raise NotImplementedError
@@ -178,9 +176,7 @@ class SokobanACStudentModel(SokobanBasicModel):
 		"""
 		old_x = x
 		img = x['image']
-		print(img.shape)
-		print("gówno")
-		#agent_dir = x['agent_dir']
+		
 		aux = x.get('aux')
 		
 		if self.rnn is not None:
@@ -190,8 +186,6 @@ class SokobanACStudentModel(SokobanBasicModel):
 			batch_dims = img.shape[:1]
 			x = self.conv(img).reshape(*batch_dims, -1)
 
-		print(x.shape)
-		print("gowno2")
 		#if self.fc_scalar is not None:
 			#if self.n_scalar_embeddings == 0:
 			#	agent_dir /= self.max_scalar
@@ -201,7 +195,7 @@ class SokobanACStudentModel(SokobanBasicModel):
 
 		if aux is not None:
 			x = jnp.concatenate([x, aux], axis=-1)
-			
+		
 		if self.rnn is not None:
 			if self.recurrent_arch == 's5':
 				x = self.embed_pre_s5(x)

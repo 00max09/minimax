@@ -56,11 +56,12 @@
         "student_n_conv_filters": [16],
         "student_n_scalar_embeddings": [0],
         "student_scalar_embed_dim": [0],
-        "sokoban_height": [10],
-        "sokoban_width": [10],
+        "sokoban_height": [12],
+        "sokoban_width": [12],
         "sokoban_ued_n_walls": [0],
         "sokoban_max_episode_steps": [250],
         "test_n_episodes": [10],
-        "test_env_names": ["Sokoban-TwoRooms"]
+        "test_env_names": ["Sokoban-TwoRooms"],
+        "wandb_project": "minimax-sokoban"
     }
 }

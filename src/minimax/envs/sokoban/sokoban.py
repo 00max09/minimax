@@ -73,7 +73,7 @@ class Sokoban(environment.Environment):
     ):
         
         super().__init__()
-        self.obs_shape = (height, width, 7)
+        self.obs_shape = (height, width, 3)
         self.action_set = jnp.array([Actions.left, Actions.right, Actions.up, Actions.down])
 
         self.params = EnvParams(
@@ -343,7 +343,7 @@ class Sokoban(environment.Environment):
         w = params.width
         return spaces.Dict({
             "agent_pos": spaces.Box(0, max(w, h), (2,), dtype=jnp.uint32),
-            "maze_map": spaces.Box(0, 255, (w + 2, h + 2, 3), dtype=jnp.uint32),
+            "maze_map": spaces.Box(0, 255, (w, h, 3), dtype=jnp.uint32),
             "time": spaces.Discrete(params.max_episode_steps),
             "terminal": spaces.Discrete(2),
         })
