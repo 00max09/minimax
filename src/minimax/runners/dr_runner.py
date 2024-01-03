@@ -119,7 +119,7 @@ class DRRunner:
 		self._update_ep_stats = jax.vmap(jax.vmap(self.rolling_stats.update_stats))
 
 		if self.render:
-			from envs.viz.grid_viz import GridVisualizer
+			from minimax.envs.viz.grid_viz import GridVisualizer
 			self.viz = GridVisualizer()
 			self.viz.show()
 

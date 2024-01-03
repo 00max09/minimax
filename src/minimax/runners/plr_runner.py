@@ -446,7 +446,6 @@ class PLRRunner(DRRunner):
 			rng, levels, level_idxs, train_state, update_plr=jnp.array([True]*self.n_students), parent_idxs=parent_idxs, dupe_mask=dupe_mask)
 		rng, train_state, state, start_state, obs, carry, extra, ep_stats, \
 			rollout_start_state, train_batch, ued_scores = result
-
 		if self.use_parallel_eval:
 			replay_start_idx = self.n_eval*n_level_samples
 			replay_end_idx = 2*replay_start_idx
@@ -458,7 +457,8 @@ class PLRRunner(DRRunner):
 		# Gradient update
 		rng, subrng = jax.random.split(rng)
 		train_state, update_stats = self._efficient_grad_update(subrng, train_state, train_batch, is_replay)
-
+		print(update_stats)
+		print("ASTAST")
 		# Mutation step
 		use_mutations = jnp.logical_and(self.use_mutations, is_replay)
 		use_mutations = jnp.logical_and(use_mutations, not self.use_parallel_eval) # Already mutated above in parallel

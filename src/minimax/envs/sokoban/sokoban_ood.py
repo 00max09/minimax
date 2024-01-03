@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 import chex
+from jax import lax
 
 from minimax.envs.registration import register
 from .sokoban import (
@@ -77,6 +78,57 @@ class SokobanSingleton(Sokoban):
         return self.get_obs(state), state
         
 
+class MicroRoom(SokobanSingleton):
+    def __init__(
+        self, 
+        normalize_obs=False):
+        maze_map = self._gen_grid()
+        unmatched_boxes = 1 
+        agent_pos = (0,0)
+
+        super().__init__(
+            agent_start_pos = agent_pos,
+            maze_map=maze_map,
+            unmatched_boxes=unmatched_boxes,
+            dim_room=(3,3),
+            num_boxes=1
+        )
+
+    def _gen_grid(self):
+        # Create the grid
+        room = jnp.zeros(shape = (3, 3, 7))
+        room = room.at[:,:,FieldStates.empty].set(1)
+        room = room.at[0,0,FieldStates.empty].set(0)
+        room = room.at[1,1,FieldStates.empty].set(0)
+        room = room.at[2,2,FieldStates.empty].set(0)
+        room = room.at[0,0,FieldStates.player].set(1)
+        room = room.at[1,1,FieldStates.box].set(1)
+        room = room.at[2,2,FieldStates.target].set(1)
+        return room
+
+    def step_env(self,
+                 key: chex.PRNGKey,
+                 state: EnvState,
+                 action: int
+        ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+        
+        a = action
+        jax.debug.print("pre_maze_map : {}",jnp.argmax(state.maze_map,axis=2))
+        jax.debug.print("action : {}", a )
+        
+        new_state, reward = self.step_agent(key, state, a)
+        new_state = new_state.replace(time=new_state.time+1)
+        done = self.is_terminal(state)
+        new_state = new_state.replace(terminal=done)
+        jax.debug.print("maze_map : {}",jnp.argmax(new_state.maze_map,axis=2))
+        jax.debug.print("action : {}", a )
+        return (
+            lax.stop_gradient(self.get_obs(new_state)),
+            lax.stop_gradient(new_state),
+            reward.astype(jnp.float32),
+            done,
+            {},
+        )
 class TwoRooms(SokobanSingleton):
     def __init__(
         self, 
@@ -98,16 +150,28 @@ class TwoRooms(SokobanSingleton):
         for i in range(10+2):
             room = room.at[i, 0, FieldStates.wall].set(1)
             room = room.at[i, 10+1, FieldStates.wall].set(1)
+            room = room.at[i, 0, FieldStates.empty].set(0)
+            room = room.at[i, 10+1, FieldStates.empty].set(0)
+            
         for z in range(10+2):
             room = room.at[0, z, FieldStates.wall].set(1)
             room = room.at[10+1, z, FieldStates.wall].set(1)
+            
+            room = room.at[0, z, FieldStates.empty].set(0)
+            room = room.at[10+1, z, FieldStates.empty].set(0)
         room = room.at[2,2,FieldStates.player].set(1)
         room = room.at[3,3,FieldStates.box].set(1)
-        room = room.at[9,9,FieldStates.box_target].set(1)
+        room = room.at[9,9,FieldStates.target].set(1)
+        room = room.at[2,2,FieldStates.empty].set(0)
+        room = room.at[3,3,FieldStates.empty].set(0)
+        room = room.at[9,9,FieldStates.empty].set(0)
+
         for z in range(1,5) :
             room = room.at[5,z,FieldStates.wall].set(1)
+            room = room.at[5,z,FieldStates.empty].set(0)
         for z in range(6,10) :
-            room.at[5,z,FieldStates.wall].set(1)
+            room = room.at[5,z,FieldStates.wall].set(1)
+            room = room.at[5,z,FieldStates.empty].set(0)
         return room
 
 
@@ -117,3 +181,5 @@ elif hasattr(__loader__, 'fullname'):
   module_path = __loader__.fullname
 
 register(env_id='Sokoban-TwoRooms', entry_point=module_path + ':TwoRooms')
+
+register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MicroRoom')

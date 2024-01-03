@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from collections import namedtuple, OrderedDict
 from functools import partial
 from enum import IntEnum
-
+import sys
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -134,7 +134,7 @@ class UEDSokoban(environment.Environment):
             if should_choose_goal:
                 # If there is goal noise, sometimes randomly place the goal
                 state.maze_map[x][y] = jnp.zeros(7)  # Remove any walls that might be in this loc
-                state.maze_map[x][y][FieldStates.box_target] = 1
+                state.maze_map[x][y][FieldStates.target] = 1
 
             # Place the agent
             elif should_choose_agent:
@@ -155,7 +155,7 @@ class UEDSokoban(environment.Environment):
                     #self.n_clutter_placed += 1
 
         state.time += 1 #self.adversary_step_count += 1
-
+        print(state.maze_map, file=sys.stderr)
         # End of episode
         if state.time >= params.n_walls + 3:
             done = True

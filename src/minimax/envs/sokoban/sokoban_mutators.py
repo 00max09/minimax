@@ -156,8 +156,8 @@ def basic_soko_mut(rng, params, state, n=1):
 
       wall_val = start_map[x][y][FieldStates.wall]
       empty_val = start_map[x][y][FieldStates.empty]
-      start_map.at[x,y,FieldStates.wall].set(empty_val)
-      start_map.at[x,y,FieldStates.empty].set(wall_val)
+      start_map = start_map.at[x,y,FieldStates.wall].set(empty_val)
+      start_map = start_map.at[x,y,FieldStates.empty].set(wall_val)
        
       # if(start_map[x][y][FieldStates.wall] == 1) :
       #   start_map.at[x,y,FieldStates.wall].set(0)
