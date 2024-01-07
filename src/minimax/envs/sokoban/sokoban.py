@@ -122,7 +122,7 @@ class Sokoban(environment.Environment):
         a = action
         new_state, reward = self.step_agent(key, state, a)
         new_state = new_state.replace(time=new_state.time + 1)
-        done = self.is_terminal(state)
+        done = self.is_terminal(new_state)
         new_state = new_state.replace(terminal=done)
         # jax.debug.print("maze_map : {}",jnp.argmax(new_state.maze_map,axis=2))
         # jax.debug.print("action : {}", a )
@@ -139,27 +139,23 @@ class Sokoban(environment.Environment):
     def reset_env(self, key: chex.PRNGKey) -> Tuple[chex.Array, EnvState]:
         params = self.params
         map_size = params.width * params.height
+        agent_pos = jax.random.randint(key, (), 0, map_size-3)
+        box_pos = jax.random.randint(key, (), agent_pos+1, map_size-2)
+        end_pos = jax.random.randint(key, (), box_pos+1, map_size-1)
+        
         agent_box_end_poses = jax.random.permutation(key, map_size)
-        room = jax.random.randint(key, (params.height, params.width), 0, 2)
-        agent_pos = (
-            agent_box_end_poses[0] // params.width,
-            agent_box_end_poses[0] % params.width,
-        )
-        box_pos = (
-            agent_box_end_poses[1] // params.width,
-            agent_box_end_poses[1] % params.width,
-        )
-        end_pos = (
-            agent_box_end_poses[2] // params.width,
-            agent_box_end_poses[2] % params.width,
-        )
+        room = jnp.ones((params.height*params.width, ))#jax.random.randint(key, (params.height, params.width), 0, 2)
 
         room = room.at[agent_pos].set(FieldStates.player)
+        agent_pos = (agent_pos// params.width,
+            agent_pos % params.width)
         room = room.at[box_pos].set(FieldStates.box)
         room = room.at[end_pos].set(FieldStates.target)
+        room = room.reshape((params.height, params.width)).astype(jnp.uint8)
         room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
             room.shape + (7,)
         )
+
         unmatched_boxes_ = 1
         state = EnvState(
             agent_pos=agent_pos,
@@ -307,7 +303,7 @@ class Sokoban(environment.Environment):
             return new_arena, new_agent_pos, new_unmatched_boxes2
 
         # return new_one_hot, new_agent_pos, new_unmatched_boxes_, done, reward
-        new_arena, new_agent_pos, new_unmatched_boxes_ = jax.lax.cond(
+        new_arena__, new_agent_pos__, new_unmatched_boxes__ = jax.lax.cond(
             agent_moves,
             _move_agent,
             lambda *x: (new_arena, new_agent_pos, new_unmatched_boxes_),
@@ -335,19 +331,19 @@ class Sokoban(environment.Environment):
 
             # if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
             one_hot_field = jnp.zeros(shape=7)
-            one_hot_field = one_hot_field.at[new_arena[i]].set(1)
+            one_hot_field = one_hot_field.at[new_arena__[i]].set(1)
             new_one_hot = new_one_hot.at[index_x, index_y, :].set(
                 one_hot_field, mode="drop"
             )
 
-        done = new_unmatched_boxes_ == 0
+        done = new_unmatched_boxes__ == 0
         # reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
         reward = 10 * done
         return (
             state.replace(
                 maze_map=new_one_hot,
-                agent_pos=new_agent_pos,
-                unmatched_boxes=new_unmatched_boxes_,
+                agent_pos=new_agent_pos__,
+                unmatched_boxes=new_unmatched_boxes__,
                 terminal=done,
             ),
             reward,

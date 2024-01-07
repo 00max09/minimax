@@ -106,29 +106,119 @@ class MicroRoom(SokobanSingleton):
         room = room.at[2,2,FieldStates.target].set(1)
         return room
 
-    def step_env(self,
-                 key: chex.PRNGKey,
-                 state: EnvState,
-                 action: int
-        ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
-        
-        a = action
-        jax.debug.print("pre_maze_map : {}",jnp.argmax(state.maze_map,axis=2))
-        jax.debug.print("action : {}", a )
-        
-        new_state, reward = self.step_agent(key, state, a)
-        new_state = new_state.replace(time=new_state.time+1)
-        done = self.is_terminal(state)
-        new_state = new_state.replace(terminal=done)
-        jax.debug.print("maze_map : {}",jnp.argmax(new_state.maze_map,axis=2))
-        jax.debug.print("action : {}", a )
-        return (
-            lax.stop_gradient(self.get_obs(new_state)),
-            lax.stop_gradient(new_state),
-            reward.astype(jnp.float32),
-            done,
-            {},
+
+class Mini2Room(SokobanSingleton):
+    def __init__(
+        self, 
+        normalize_obs=False):
+        maze_map = self._gen_grid()
+        unmatched_boxes = 1 
+        agent_pos = (0,0)
+
+        super().__init__(
+            agent_start_pos = agent_pos,
+            maze_map=maze_map,
+            unmatched_boxes=unmatched_boxes,
+            dim_room=(5,5),
+            num_boxes=1
         )
+
+    def _gen_grid(self):
+        # Create the grid
+        room = jnp.array([
+            [5, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 1, 4, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 2],
+            ])
+        room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
+            room.shape + (7,)
+        )
+        return room
+
+class MiniRoom(SokobanSingleton):
+    def __init__(
+        self, 
+        normalize_obs=False):
+        maze_map = self._gen_grid()
+        unmatched_boxes = 1 
+        agent_pos = (0,0)
+
+        super().__init__(
+            agent_start_pos = agent_pos,
+            maze_map=maze_map,
+            unmatched_boxes=unmatched_boxes,
+            dim_room=(5,5),
+            num_boxes=1
+        )
+
+    def _gen_grid(self):
+        # Create the grid
+        room = jnp.array([
+            [5, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1],
+            [1, 1, 4, 1, 1],
+            [1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 2],
+            ])
+        room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
+            room.shape + (7,)
+        )
+        return room
+
+class MiniMaze(SokobanSingleton):
+    def __init__(
+        self, 
+        normalize_obs=False):
+        maze_map = self._gen_grid()
+        unmatched_boxes = 1 
+        agent_pos = (0,0)
+
+        super().__init__(
+            agent_start_pos = agent_pos,
+            maze_map=maze_map,
+            unmatched_boxes=unmatched_boxes,
+            dim_room=(5,5),
+            num_boxes=1
+        )
+
+    def _gen_grid(self):
+        # Create the grid
+        room = jnp.array([
+            [5, 0, 1, 1, 1],
+            [1, 0, 4, 0, 1],
+            [1, 0, 2, 0, 1],
+            [1, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1],
+            ])
+        room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
+            room.shape + (7,)
+        )
+        return room
+    # def step_env(self,
+    #              key: chex.PRNGKey,
+    #              state: EnvState,
+    #              action: int
+    #     ) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+        
+    #     a = action
+    #     jax.debug.print("pre_maze_map : {}",jnp.argmax(state.maze_map,axis=2))
+    #     jax.debug.print("action : {}", a )
+        
+    #     new_state, reward = self.step_agent(key, state, a)
+    #     new_state = new_state.replace(time=new_state.time+1)
+    #     done = self.is_terminal(new_state)
+    #     new_state = new_state.replace(terminal=done)
+    #     jax.debug.print("maze_map : {}",jnp.argmax(new_state.maze_map,axis=2))
+    #     jax.debug.print("action : {}", a )
+    #     return (
+    #         lax.stop_gradient(self.get_obs(new_state)),
+    #         lax.stop_gradient(new_state),
+    #         reward.astype(jnp.float32),
+    #         done,
+    #         {},
+    #     )
 class TwoRooms(SokobanSingleton):
     def __init__(
         self, 
@@ -140,25 +230,27 @@ class TwoRooms(SokobanSingleton):
         super().__init__(
             agent_start_pos = agent_pos,
             maze_map=maze_map,
-            unmatched_boxes=unmatched_boxes
+            unmatched_boxes=unmatched_boxes,
+            dim_room=(10,10),
+            num_boxes=1
         )
 
     def _gen_grid(self):
         # Create the grid
-        room = jnp.zeros(shape = (10+2, 10+2, 7))
+        room = jnp.zeros(shape = (10, 10, 7))
         room = room.at[:,:,FieldStates.empty].set(1)
-        for i in range(10+2):
+        for i in range(10):
             room = room.at[i, 0, FieldStates.wall].set(1)
-            room = room.at[i, 10+1, FieldStates.wall].set(1)
+            room = room.at[i, 9, FieldStates.wall].set(1)
             room = room.at[i, 0, FieldStates.empty].set(0)
-            room = room.at[i, 10+1, FieldStates.empty].set(0)
+            room = room.at[i, 9, FieldStates.empty].set(0)
             
-        for z in range(10+2):
+        for z in range(10):
             room = room.at[0, z, FieldStates.wall].set(1)
-            room = room.at[10+1, z, FieldStates.wall].set(1)
+            room = room.at[9, z, FieldStates.wall].set(1)
             
             room = room.at[0, z, FieldStates.empty].set(0)
-            room = room.at[10+1, z, FieldStates.empty].set(0)
+            room = room.at[9, z, FieldStates.empty].set(0)
         room = room.at[2,2,FieldStates.player].set(1)
         room = room.at[3,3,FieldStates.box].set(1)
         room = room.at[9,9,FieldStates.target].set(1)
@@ -183,3 +275,8 @@ elif hasattr(__loader__, 'fullname'):
 register(env_id='Sokoban-TwoRooms', entry_point=module_path + ':TwoRooms')
 
 register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MicroRoom')
+
+
+register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MiniRoom')
+register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':Mini2Room')
+register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MiniMaze')

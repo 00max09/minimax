@@ -163,7 +163,6 @@ class UEDSokoban(environment.Environment):
             self.compute_metrics()
         else:
             done = False
-        #@TODO repair render
         obs = self.get_obs(state)
         return (
             lax.stop_gradient(obs),

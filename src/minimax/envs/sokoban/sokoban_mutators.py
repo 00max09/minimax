@@ -146,7 +146,6 @@ def basic_soko_mut(rng, params, state, n=1):
     edit_locs = list(set(jax.random.randint(rng, (n,), 0, num_tiles)))
     actions = jax.random.randint(rng, (n, ), 0, 1)
 
-    free_mask = start_map[:][:]
     #free_mask[self.agent_start_pos[1]-1, self.agent_start_pos[0]-1] = False
     #free_mask[self.goal_pos[1]-1, self.goal_pos[0]-1] = False
 
