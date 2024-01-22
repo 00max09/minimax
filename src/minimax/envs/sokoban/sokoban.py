@@ -55,6 +55,7 @@ class EnvParams:
     max_episode_steps: int = 250
     singleton_seed: int = -1
     num_boxes: int = 4
+    normalize_obs: bool = True
 
 
 class Sokoban(environment.Environment):
@@ -69,6 +70,7 @@ class Sokoban(environment.Environment):
         penalty_for_step=-0.1,
         # currently penalty_box_off_target is implicitly = - reward_box_on_target
         # penalty_box_off_target=-1,
+        normalize_obs=True,
         reward_box_on_target=1,
         reward_finished=10,
         seed=None,
@@ -86,7 +88,7 @@ class Sokoban(environment.Environment):
             max_episode_steps=max_episode_steps,
             num_boxes=num_boxes,
             # max_episode_steps=max_episode_steps,
-            # normalize_obs=normalize_obs,
+            normalize_obs=normalize_obs,
             # sample_n_walls=sample_n_walls,
             # obs_agent_pos=obs_agent_pos,
             singleton_seed=-1,
@@ -155,7 +157,7 @@ class Sokoban(environment.Environment):
         room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
             room.shape + (7,)
         )
-
+        # jax.debug.print("reseted maze map : {}",jnp.argmax(room,axis=2))
         unmatched_boxes_ = 1
         state = EnvState(
             agent_pos=agent_pos,
@@ -192,8 +194,8 @@ class Sokoban(environment.Environment):
         """Return grid view."""
 
         image = render(self.params, state.maze_map).astype(jnp.uint8)
-        # if self.params.normalize_obs:
-        #    image = image/10.0
+        if self.params.normalize_obs:
+           image = image/10.0
 
         obs_dict = dict(image=image)
 
@@ -227,6 +229,9 @@ class Sokoban(environment.Environment):
         #     delta_x, delta_y = 0, 1
 
         one_hot = state.maze_map
+        
+    
+        #jax.debug.print("pre move maze map : {}",jnp.argmax(one_hot,axis=2))
         agent_pos = state.agent_pos
         unmatched_boxes = state.unmatched_boxes
 
@@ -339,6 +344,12 @@ class Sokoban(environment.Environment):
         done = new_unmatched_boxes__ == 0
         # reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
         reward = 10 * done
+        
+        #jax.debug.print("move {} {}",delta_x, delta_y)
+        
+        #jax.debug.print("post move maze map : {}",jnp.argmax(new_one_hot,axis=2))
+        
+        #jax.debug.print("move reward: {}", reward)
         return (
             state.replace(
                 maze_map=new_one_hot,
@@ -414,7 +425,12 @@ class Sokoban(environment.Environment):
         #     state.agent_pos,
         #     state.goal_pos
         #
-        n_walls = jnp.sum(state.maze_map[:][:][FieldStates.wall])
+        
+        #jax.debug.print("5 walls?XDDDDD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\n{}", state.maze_map)
+        #jax.debug.print("5 wallsbut only walls?XDDDDD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\nXD\n{}",state.maze_map[:,:,FieldStates.wall])
+        #jax.debug.print("5 walls?XD\n{}", jnp.argmax(state.maze_map,axis=2))
+        n_walls = jnp.sum(state.maze_map[:,:,FieldStates.wall])
+        #jax.debug.print("n_walls : {}", n_walls)
         return dict(
             n_wall=n_walls
             # n_walls=n_walls,

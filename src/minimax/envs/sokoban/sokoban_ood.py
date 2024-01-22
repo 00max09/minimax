@@ -22,7 +22,7 @@ class SokobanSingleton(Sokoban):
         agent_start_pos,
         unmatched_boxes,
         dim_room=(10, 10),
-        max_steps=jnp.inf,
+        max_steps=250,
         num_boxes=4,
         num_gen_steps=None,
         fast_state_eq=False,
@@ -195,6 +195,7 @@ class MiniMaze(SokobanSingleton):
         room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
             room.shape + (7,)
         )
+        jax.debug.print("room {}", room)
         return room
     # def step_env(self,
     #              key: chex.PRNGKey,
@@ -273,10 +274,7 @@ elif hasattr(__loader__, 'fullname'):
   module_path = __loader__.fullname
 
 register(env_id='Sokoban-TwoRooms', entry_point=module_path + ':TwoRooms')
-
 register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MicroRoom')
-
-
-register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MiniRoom')
-register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':Mini2Room')
-register(env_id='Sokoban-MicroRoom', entry_point=module_path + ':MiniMaze')
+register(env_id='Sokoban-MiniRoom', entry_point=module_path + ':MiniRoom')
+register(env_id='Sokoban-Mini2Room', entry_point=module_path + ':Mini2Room')
+register(env_id='Sokoban-MiniMaze', entry_point=module_path + ':MiniMaze')

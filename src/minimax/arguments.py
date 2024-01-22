@@ -786,13 +786,13 @@ env_sokoban_all_parser = parser.add_subparser(
 #     const=True, 
 #     default=True,
 #     help='Whether the agent sees itself in observations.')
-# env_sokoban_all_parser.add_argument(
-#     '--normalize_obs',
-#     type=str2bool, 
-#     nargs='?', 
-#     const=True, 
-#     default=True,
-#     help='Ensure observations are between 0 and 1.')
+env_sokoban_all_parser.add_argument(
+     '--normalize_obs',
+     type=str2bool, 
+     nargs='?', 
+     const=True, 
+     default=True,
+     help='Ensure observations are between 0 and 1.')
 # env_sokoban_all_parser.add_argument(
 #     '--obs_agent_pos',
 #     type=str2bool, 

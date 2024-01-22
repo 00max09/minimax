@@ -457,8 +457,8 @@ class PLRRunner(DRRunner):
 		# Gradient update
 		rng, subrng = jax.random.split(rng)
 		train_state, update_stats = self._efficient_grad_update(subrng, train_state, train_batch, is_replay)
-		print(update_stats)
-		print("ASTAST")
+		# print(update_stats)
+		# print("ASTAST")
 		# Mutation step
 		use_mutations = jnp.logical_and(self.use_mutations, is_replay)
 		use_mutations = jnp.logical_and(use_mutations, not self.use_parallel_eval) # Already mutated above in parallel
