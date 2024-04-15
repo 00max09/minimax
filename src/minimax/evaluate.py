@@ -12,7 +12,7 @@ import re
 import fnmatch
 import sys
 from collections import defaultdict
-
+import time
 import numpy as np
 import pandas as pd
 import scipy.stats as spstats
@@ -150,6 +150,8 @@ if __name__ == '__main__':
 		)
 
 		with jax.disable_jit(args.render_mode is not None):
+			
+			
 			student_model = models.make(
 				env_name=xp_args.env_name,
 				model_name=xp_args.student_model_name,
@@ -192,6 +194,7 @@ if __name__ == '__main__':
 				all_eval_stats[k].append(float(v))
 
 			pbar.update(1)
+			
 
 	pbar.close()
 

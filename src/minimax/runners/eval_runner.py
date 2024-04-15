@@ -12,6 +12,7 @@ from typing import Tuple, Optional
 import numpy as np
 import jax
 import jax.numpy as jnp
+import time
 
 import minimax.envs as envs
 from minimax.util.rl import (
@@ -118,8 +119,8 @@ class EvalRunner:
         for env_name, kwargs in zip(env_names, env_kwargs):
             benv = envs.BatchEnv(
                 env_name=env_name,
-                n_parallel=n_episodes,
-                n_eval=1,
+                n_parallel=1,
+                n_eval=n_episodes,
                 env_kwargs=kwargs,
                 wrappers=['monitor_return', 'monitor_ep_metrics']
             )
@@ -143,7 +144,7 @@ class EvalRunner:
         if render_mode:
             from minimax.envs.viz.grid_viz import GridVisualizer
             self.viz = GridVisualizer()
-            self.viz.show()
+            #self.viz.show()
 
             if render_mode == 'ipython':
                 from IPython import display
@@ -166,12 +167,15 @@ class EvalRunner:
         carry,
         zero_carry,
         extra):
+        start_time = time.time()
         value, pi_params, next_carry = self.pop.act(params, obs, carry)
         pi = self.pop.get_action_dist(pi_params, dtype=self.action_dtype)
         rng, subrng = jax.random.split(rng)
         action = pi.sample(seed=subrng)
         log_pi = pi.log_prob(action)
-
+        
+        jax.debug.print("--- %s strart seconds ---" % (time.time() - start_time))
+        
         rng, *vrngs = jax.random.split(rng, self.pop.n_agents+1)
 
         step_args = (jnp.array(vrngs), state, action, extra)
@@ -182,24 +186,26 @@ class EvalRunner:
          info, 
          extra) = benv.step(*step_args)
 
+        jax.debug.print("--- %s quatroo seconds ---" % (time.time() - start_time))
+        
         # Add transition to storage
         step = (obs, action, reward, done, log_pi, value)
         if carry is not None:
             step += (carry,)
-
         # Zero carry if needed
         if carry is not None:
             next_carry = jax.vmap(_tree_util.pytree_select)(
                 done, zero_carry, next_carry)
-
+        jax.debug.print("--- %s half seconds ---" % (time.time() - start_time))
         if self.render_mode:
             self.viz.render(
                 benv.env.params, 
                 jax.tree_util.tree_map(lambda x: x[0][0], state))
+            self.viz.screenshot("movie/")
             if self.render_mode == 'ipython':
                 self.ipython_display.display(self.viz.window.fig)
                 self.ipython_display.clear_output(wait=True)
-
+        jax.debug.print("--- %s seconds ---" % (time.time() - start_time))
         return next_state, next_obs, next_carry, done, info, extra
 
     @partial(jax.jit, static_argnums=(0, 2))

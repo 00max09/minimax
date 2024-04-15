@@ -30,9 +30,11 @@ class GridVisualizer:
 	Manages a window and renders contents of EnvState instances to it.
 	"""
 	tile_cache = {}
+	tile_count = 0
 
 	def __init__(self):
 		self.window = None
+		self.tile_count=0
 
 	def _lazy_init_window(self):
 		if self.window is None:
@@ -43,8 +45,13 @@ class GridVisualizer:
 		self.window.show(block=block)
 
 	def screenshot(self, path):
+
+		#import time
+		#start_time = time.time()
 		self._lazy_init_window()
-		self.window.save_img(path)
+		self.window.save_img(path + str(self.tile_count))
+		self.tile_count+=1
+		#rint("--- %s seconds ---" % (time.time() - start_time), flush=True)
 
 	def render(self, params, state, highlight=True, tile_size=TILE_PIXELS, maze_map=None):
 		return self._render_state(params, state, highlight, tile_size, maze_map)

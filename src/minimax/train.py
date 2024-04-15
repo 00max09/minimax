@@ -15,6 +15,8 @@ os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.70'
 
 import jax
 import wandb
+from jax import config
+config.update("jax_debug_nans", True)
 
 from minimax.runners import ExperimentRunner
 from minimax.util.loggers import Logger
@@ -54,7 +56,7 @@ if __name__ == '__main__':
 			os.environ["WANDB_API_KEY"] = wandb_args.api_key
 		if wandb_args.base_url and wandb_args.api_key:
 			os.environ["WANDB_CACHE_DIR"] = '~/.cache/wandb'
-			os.environ["WANDB_MODE"] = "offline"
+			os.environ["WANDB_MODE"] = "online"
 			wandb.init(project=wandb_args.project, 
 					   entity=wandb_args.entity, 
 					   config=args, 

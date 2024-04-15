@@ -295,6 +295,7 @@ class ExperimentRunner:
 					checkpoint_state = \
 						self.runner.get_checkpoint_state(runner_state)
 					logger.checkpoint(
-						checkpoint_state, 
+						checkpoint_state,
+						name="checkpoint" + str(train_state.n_updates),
 						index=tick, 
 						archive_interval=archive_interval)

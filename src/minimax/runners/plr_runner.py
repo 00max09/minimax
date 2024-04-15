@@ -271,6 +271,7 @@ class PLRRunner(DRRunner):
 
 	@partial(jax.jit, static_argnums=(0,))
 	def _mutate_levels(self, rng, levels, level_idxs, ued_scores=None):
+		
 		if not self.use_mutations:
 			return levels, level_idxs, jnp.full_like(level_idxs, -1)
 
@@ -306,7 +307,6 @@ class PLRRunner(DRRunner):
 
 		# Mutated levels do not have existing idxs in the PLR buffer.
 		mutated_level_idxs = jnp.full((self.n_students, n_parallel), -1)
-
 		return mutated_levels, mutated_level_idxs, parent_idxs
 
 	def _efficient_grad_update(self, rng, train_state, train_batch, is_replay):
