@@ -138,7 +138,7 @@ class Mutations(IntEnum):
 #     return state.replace(maze_map=next_maze_map)
 
 @partial(jax.jit, static_argnums=(1,3))
-def basic_soko_mut(rng, params, state, n=1):
+def basic_soko_mut(key, params, state, n=1):
     if n == 0:
         return state
     
@@ -147,8 +147,10 @@ def basic_soko_mut(rng, params, state, n=1):
     
     #jax.debug.print("pre mut maze_map : {}",jnp.argmax(start_map,axis=2))
     num_tiles = params.width*params.height
-    edit_locs = list(set(jax.random.randint(rng, (n,), 0, num_tiles)))
-    actions = jax.random.randint(rng, (n, ), 0, 1)
+    edit_locs = list(set(jax.random.randint(key, (n,), 0, num_tiles)))
+    
+    key, subkey = jax.random.split(key)
+    actions = jax.random.randint(subkey, (n, ), 0, 1)
 
     #free_mask[self.agent_start_pos[1]-1, self.agent_start_pos[0]-1] = False
     #free_mask[self.goal_pos[1]-1, self.goal_pos[0]-1] = False

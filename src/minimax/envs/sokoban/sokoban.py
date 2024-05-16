@@ -142,11 +142,14 @@ class Sokoban(environment.Environment):
         params = self.params
         map_size = params.width * params.height
         agent_pos = jax.random.randint(key, (), 0, map_size-3)
-        box_pos = jax.random.randint(key, (), agent_pos+1, map_size-2)
-        end_pos = jax.random.randint(key, (), box_pos+1, map_size-1)
-        
-        agent_box_end_poses = jax.random.permutation(key, map_size)
-        room = jax.random.randint(key, (params.height * params.width, ), 0, 2) #jnp.ones((params.height*params.width, ))
+        key, subkey = jax.random.split(key)
+        box_pos = jax.random.randint(subkey, (), agent_pos+1, map_size-2)
+        key, subkey = jax.random.split(key)
+        end_pos = jax.random.randint(subkey, (), box_pos+1, map_size-1)
+        key, subkey = jax.random.split(key)
+        agent_box_end_poses = jax.random.permutation(subkey, map_size)
+        key, subkey = jax.random.split(key)
+        room = jax.random.randint(subkey, (params.height * params.width, ), 0, 2) #jnp.ones((params.height*params.width, ))
         #jax.debug.print("reseted maze map pre setting agent: {}", room)
         
         room = room.at[agent_pos].set(FieldStates.player)
