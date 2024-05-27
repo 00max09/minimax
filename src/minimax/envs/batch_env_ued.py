@@ -56,6 +56,9 @@ class BatchUEDEnv:
 		
 		self.set_env_instance = jax.vmap(self._set_env_instance, in_axes=0)
 		self.get_env_metrics = jax.vmap(self._get_env_metrics, in_axes=0)
+		self.step_alice_teacher = jax.vmap(self._step_alice_teacher, in_axes=0)
+		
+		self.add_reward_structure_for_bob = jax.vmap(self._add_reward_structure_for_bob, in_axes=0)
 
 	partial(jax.jit, static_argnums=(2,))
 	def reset(self, rng, sub_batch_size=None):
@@ -92,6 +95,17 @@ class BatchUEDEnv:
 			step_args += (extra,)
 
 		return jax.vmap(self.env.step_teacher)(*step_args)
+
+	def _step_alice_teacher(self, rng, ued_state, action, extra=None):
+		"""
+		Step n_parallel envs
+		"""
+		brngs = jax.random.split(rng, self.n_parallel)
+		step_args = (brngs, ued_state, action)
+		if extra is not None:
+			step_args += (extra,)
+
+		return jax.vmap(self.env.step_alice_teacher)(*step_args)
 
 	def _reset_student(self, rng, ued_state, n_students):
 		"""
@@ -131,3 +145,14 @@ class BatchUEDEnv:
 
 	def _get_env_metrics(self, state):
 		return jax.vmap(self.env.get_env_metrics)(state) 
+
+	def _add_reward_structure_for_bob(
+		self, 
+		rng, 
+		base_state, 
+		alice_final_state
+	):
+		"""Environment-specific reward setter."""
+		brngs = jax.random.split(rng, self.sub_batch_size)
+		return jax.vmap(self.env.add_reward_structure_for_bob)(brngs, base_state, alice_final_state)
+

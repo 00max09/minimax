@@ -51,6 +51,15 @@ class UEDEnvironment:
 		return self.ued_env.step(
 			rng, ued_state, action, reset_on_done=False)
 
+	def step_alice_teacher(
+		self,
+		rng: chex.PRNGKey,
+		ued_state: EnvState,
+		action: Union[int, float],
+	) -> Tuple[chex.ArrayTree, EnvState, float, bool, dict]:
+		return self.ued_env.alice_step(
+			rng, ued_state, action, reset_on_done=False)
+
 	def reset_student(
 		self,
 		rng: chex.PRNGKey, 
@@ -74,6 +83,20 @@ class UEDEnvironment:
 			state, 
 			action, 
 			reset_state=reset_state)
+
+	def add_reward_structure_for_bob(
+		self, 
+		key:chex.PRNGKey, 
+		base_state : EnvState, 
+		alice_final_state : EnvState
+	) -> Tuple[chex.Array, EnvState]:
+		"""Environment-specific reward set."""
+		return self.env.add_reward_structure_for_bob(
+			key,
+			base_state,
+			alice_final_state
+		)
+
 
 	def set_env_instance(self, encoding: chex.ArrayTree):
 		return self.env.set_env_instance(encoding) 
@@ -113,4 +136,4 @@ class UEDEnvironment:
 
 	def get_env_metrics(self, state: EnvState):
 		"""Environment-specific metrics, e.g. number of walls."""
-		return self.env.get_env_metrics(state)
+		return self.env.get_env_metrics(state) 

@@ -36,7 +36,7 @@ parser.add_argument(
     '--train_runner',
     type=str,
     default='dr',
-    choices=['dr', 'plr', 'paired'],
+    choices=['dr', 'plr', 'paired', 'paired_async'],
     help='Algorithm runner.')
 parser.add_argument(
     '--n_devices',
@@ -128,7 +128,7 @@ parser.add_dependent_argument(
     '--ued_score',
     type=str,
     default='relative_regret',
-    dependency={'train_runner': ['plr', 'paired']},
+    dependency={'train_runner': ['plr', 'paired', 'paired_async']},
     dest='train_runner',
     choices=[
         'relative_regret',
@@ -138,7 +138,10 @@ parser.add_dependent_argument(
         'l1_value_loss', 
         'positive_value_loss',
         'max_mc',
-        'value_disagreement'
+        'value_disagreement',
+        'alice_and_bob_regret',
+        'alice_and_bob_leaked_regret',
+        'paired_async'
     ],
     help='UED score of agent.')
 
@@ -232,7 +235,7 @@ plr_subparser.add_argument(
 paired_subparser = parser.add_subparser(
     name='paired',
     prefix='paired',
-    dependency={'train_runner': 'paired'},
+    dependency={'train_runner': ['paired', 'paired_async']},
     dest='train_runner')
 
 
@@ -296,7 +299,7 @@ parser.add_dependent_argument(
 teacher_rl_subparser = parser.add_subparser(
     name='teacher_rl',
     prefix='teacher',
-    dependency={'train_runner':['paired']})
+    dependency={'train_runner':['paired', 'paired_async']})
 teacher_rl_subparser.add_argument(
     '--entropy_coef',
     type=float,
@@ -316,7 +319,7 @@ parser.add_dependent_argument(
     '--teacher_discount',
     type=float,
     default=0.995,
-    dependency={'train_runner': 'paired'},
+    dependency={'train_runner': ['paired', 'paired_async']},
     dest='train_runner',
     help='discount factor for rewards')
 parser.add_dependent_argument(
@@ -324,7 +327,7 @@ parser.add_dependent_argument(
     type=float, 
     default=None,
     nargs="?",
-    dependency={'agent_rl_algo': 'ppo', 'train_runner': 'paired'},
+    dependency={'agent_rl_algo': 'ppo', 'train_runner': ['paired', 'paired_async']},
     dest='train_runner',
     help='Initial learning rate of teacher.')
 parser.add_dependent_argument(
@@ -332,7 +335,7 @@ parser.add_dependent_argument(
     type=float,
     default=None,
     nargs="?",
-    dependency={'agent_rl_algo': 'ppo', 'train_runner': 'paired'},
+    dependency={'agent_rl_algo': 'ppo', 'train_runner': ['paired', 'paired_async']},
     dest='train_runner',
     help='Initial learning rate of teacher.')
 parser.add_dependent_argument(
@@ -340,7 +343,7 @@ parser.add_dependent_argument(
     type=int,
     default=0,
     nargs="?",
-    dependency={'agent_rl_algo': 'ppo', 'train_runner': 'paired'},
+    dependency={'agent_rl_algo': 'ppo', 'train_runner': ['paired', 'paired_async']},
     dest='train_runner',
     help='Initial learning rate of teacher.')
 
@@ -350,7 +353,7 @@ teacher_ppo_subparser = parser.add_subparser(
     name='teacher_ppo',
     prefix='teacher_ppo',
     dest='teacher_rl',
-    dependency={'agent_rl_algo': 'ppo', 'train_runner': 'paired'})
+    dependency={'agent_rl_algo': 'ppo', 'train_runner': ['paired', 'paired_async']})
 teacher_ppo_subparser.add_argument(
     '--n_epochs',
     type=int,
@@ -375,7 +378,7 @@ parser.add_dependent_argument(
     '--teacher_gae_lambda',
     type=float,
     default=0.95,
-    dependency={'agent_rl_algo': 'ppo', 'train_runner': 'paired'},
+    dependency={'agent_rl_algo': 'ppo', 'train_runner': ['paired', 'paired_async']},
     dest='train_runner',
     help='GAE lambda parameter for teacher.')
 
@@ -548,7 +551,7 @@ student_sokoban_model_parser.add_argument(
 # ==== Teacher model arguments.
 parser.add_dependent_argument(
     '--teacher_model_name',
-    dependency={'train_runner': ['paired']},
+    dependency={'train_runner':['paired', 'paired_async']},
     type=str,
     help='Name of teacher model architecture.'
 )
@@ -557,14 +560,14 @@ parser.add_dependent_argument(
 teacher_model_parser = parser.add_subparser(
     name='teacher_model',
     prefix='teacher',
-    dependency={'train_runner': ['paired']})
+    dependency={'train_runner':['paired', 'paired_async']})
 
 # ---- Maze args for PAIRED teacher model ----
 teacher_maze_model_parser = parser.add_subparser(
     name='teacher_maze_model',
     prefix='teacher',
     dest="teacher_model",
-    dependency={'train_runner': 'paired', 'env_name': 'Maze*'})
+    dependency={'train_runner': ['paired', 'paired_async'], 'env_name': 'Maze*'})
 teacher_maze_model_parser.add_argument(
     '--recurrent_arch',
     type=str,
@@ -629,7 +632,7 @@ teacher_sokoban_model_parser = parser.add_subparser(
     name='teacher_sokoban_model',
     prefix='teacher',
     dest="teacher_model",
-    dependency={'train_runner': 'paired', 'env_name': 'Sokoban'})
+    dependency={'train_runner':['paired', 'paired_async'], 'env_name': 'Sokoban'})
 teacher_sokoban_model_parser.add_argument(
     '--recurrent_arch',
     type=str,
@@ -810,7 +813,7 @@ env_sokoban_all_parser.add_argument(
 maze_ued_parser = parser.add_subparser(
     name='maze_ued',
     prefix='maze_ued',
-    dependency={'env_name': ['Maze', 'Maze-MemoryMaze'], 'train_runner': 'paired'},
+    dependency={'env_name': ['Maze', 'Maze-MemoryMaze'], 'train_runner': ['paired', 'paired_async']},
     dest='ued_env')
 maze_ued_parser.add_argument(
     '--replace_wall_pos',

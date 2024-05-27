@@ -227,6 +227,87 @@ class UEDMaze(environment.Environment):
 			{},
 		)
 
+	def alice_step_env(
+		self,
+		key: chex.PRNGKey,
+		state: EnvState,
+		action: int,
+	) -> Tuple[chex.Array, EnvState, float, bool, dict]:
+		"""
+		Take a design step. 
+			action: A pos as an int from 0 to (height*width)-1
+		"""
+		params = self.params
+
+		collision_rng, noise_rng = jax.random.split(key)
+
+		# Sample a random free tile in case of a collision
+		dist_values = jnp.logical_and( # True if position taken
+			jnp.ones(params.n_walls + 2), 
+			jnp.arange(params.n_walls + 2)+1 > state.time
+		)
+
+		# Get zero-indexed last wall time step
+		if params.fixed_n_wall_steps:
+			max_n_walls = params.n_walls
+			encoding_pos = state.encoding[:params.n_walls+2]
+			last_wall_step_idx = max_n_walls - 1
+		else:
+			max_n_walls = jnp.round(
+				params.n_walls*state.encoding[0]/self.n_tiles).astype(jnp.uint32)
+
+			if self.params.first_wall_pos_sets_budget:
+				encoding_pos = state.encoding[:params.n_walls+2]
+				last_wall_step_idx = jnp.maximum(max_n_walls,1) - 1
+			else:
+				encoding_pos = state.encoding[1:params.n_walls+3]
+				last_wall_step_idx = max_n_walls
+
+		pos_dist = jnp.ones(self.n_tiles).at[
+			jnp.flip(encoding_pos)].set(jnp.flip(dist_values))
+		all_pos = jnp.arange(self.n_tiles, dtype=jnp.uint32)
+
+		# Only mark collision if replace_wall_pos=False OR the agent is placed over the goal
+		agent_step_idx = last_wall_step_idx + 2
+
+		# Track whether it is the last time step
+		next_state = state.replace(time=state.time + 1)
+		done = self.is_terminal(next_state)
+
+		# Always place agent idx in last enc position.
+		is_agent_dir_step = jnp.logical_and(
+			params.set_agent_dir,
+			done
+		)
+
+		collision = jnp.logical_and(
+			pos_dist[action] < 1,
+			not params.replace_wall_pos
+		)
+		collision = (collision * (1-is_agent_dir_step)).astype(jnp.uint32)
+
+		action = (1-collision)*action + \
+			collision*jax.random.choice(collision_rng, all_pos, replace=False, p=pos_dist)
+
+		enc_idx = (1-is_agent_dir_step)*state.time + is_agent_dir_step*(-1)
+		encoding = state.encoding.at[enc_idx].set(action)
+
+		next_state = next_state.replace(
+			encoding=encoding,
+			terminal=done
+		)
+		reward = 0
+
+		obs = self._add_noise_to_obs(noise_rng, self.get_obs(next_state))
+
+		return (
+			lax.stop_gradient(obs),
+			lax.stop_gradient(next_state),
+			reward,
+			done,
+			{},
+		)
+
 	def get_env_instance(
 			self, 
 			key: chex.PRNGKey,

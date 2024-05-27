@@ -357,6 +357,11 @@ class Maze(environment.Environment):
 				terminal=fwd_pos_has_goal),
 			reward
 		)
+	
+	def add_reward_structure_for_bob(self, key:chex.PRNGKey, base_state : EnvState, alice_final_state : EnvState) -> Tuple[chex.Array, EnvState]:
+		new_state = base_state
+		new_state = new_state.replace(goal_pos=alice_final_state.agent_pos)
+		return self.get_obs(new_state), new_state
 
 	def is_terminal(self, state: EnvState) -> bool:
 		"""Check whether state is terminal."""

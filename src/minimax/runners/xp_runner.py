@@ -21,6 +21,7 @@ from .eval_runner import EvalRunner
 from .dr_runner import DRRunner
 from .paired_runner import PAIREDRunner
 from .plr_runner import PLRRunner
+from .paired_async_runner import PAIREDASYNCRunner
 from minimax.util.rl import UEDScore, PopPLRManager
 import minimax.envs as envs
 import minimax.models as models
@@ -45,6 +46,10 @@ RUNNER_INFO = {
 	),
 	'paired': RunnerInfo(
 		runner_cls=PAIREDRunner,
+		is_ued=True
+	),
+	'paired_async': RunnerInfo(
+		runner_cls=PAIREDASYNCRunner,
 		is_ued=True
 	)
 }
@@ -157,12 +162,17 @@ class ExperimentRunner:
 		# ---- Make eval runner ----
 		if eval_kwargs.get('env_names') is None:
 			self.eval_runner = None
-		else:
+		elif hasattr(self.runner,'student_pop') :
 			self.eval_runner = EvalRunner(
 				pop=self.runner.student_pop,
 				env_kwargs=eval_env_kwargs,
 				**eval_kwargs)
-
+		else :
+			self.eval_runner = EvalRunner(
+				pop=self.runner.bob_pop,
+				env_kwargs=eval_env_kwargs,
+				**eval_kwargs)
+		
 		self._start_tick = 0
 
 		# ---- Set up device parallelism ----
@@ -179,9 +189,9 @@ class ExperimentRunner:
 			run_fn = self._shmap_run
 		else:
 			run_fn = self.runner.run
-
+		
 		stats, *runner_state = run_fn(*runner_state)
-
+		
 		rng = runner_state[0]
 		rng, subrng = jax.random.split(rng)
 
@@ -258,7 +268,7 @@ class ExperimentRunner:
 
 		while (train_state.n_updates < n_total_updates).any():
 			evaluate = test_interval > 0 and (tick+1) % test_interval == 0
-
+			
 			start = time.time()
 			stats, eval_stats, *runner_state = \
 				self.step(runner_state, evaluate)

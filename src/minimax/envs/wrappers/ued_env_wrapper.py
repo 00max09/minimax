@@ -80,6 +80,19 @@ class UEDEnvWrapper:
 		else:
 			_tuple = self._env.step_teacher(rng, ued_state, action)
 			return self._append_extra_to_tuple(_tuple)
+	
+	def step_alice_teacher(
+		self,
+		rng: chex.PRNGKey,
+		ued_state: EnvState,
+		action: Union[int, float],
+		extra: dict = None,
+	) -> Tuple[chex.ArrayTree, EnvState, float, bool, dict]:
+		if self._wrap_level > 1:
+			return self._env.step_alice_teacher(rng, ued_state, action, extra)
+		else:
+			_tuple = self._env.step_alice_teacher(rng, ued_state, action)
+			return self._append_extra_to_tuple(_tuple)
 
 	def __getattr__(self, attr):
 		return getattr(self._env, attr)

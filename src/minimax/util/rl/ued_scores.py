@@ -26,6 +26,10 @@ class UEDScore(Enum):
 	POSITIVE_VALUE_LOSS = 7
 	MAX_MC = 8
 	VALUE_DISAGREEMENT = 9
+	ALICE_AND_BOB_REGRET = 10
+	ALICE_AND_BOB_LEAKED_REGRET = 11
+	REVERSED_POSITIVE_RETURN = 12
+
 
 
 @partial(jax.jit, static_argnums=(2,3))
@@ -95,6 +99,8 @@ def compute_episodic_stats(
 
 	return total_metrics_per_env/n_episodes_per_env, max_metrics_per_env
 
+
+
 @partial(jax.jit, static_argnums=(0,))
 def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 	"""
@@ -102,7 +108,15 @@ def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 	Individual score functions return a tuple of mean_scores and max_scores,
 	where each is of dimension n_agents x n_envs.
 	"""
-	if score_name in [UEDScore.RELATIVE_REGRET, UEDScore.MEAN_RELATIVE_REGRET, UEDScore.POPULATION_REGRET]:
+	if score_name == UEDScore.ALICE_AND_BOB_REGRET: 
+		batch.rewards.at[1].set(batch.rewards[1] * (batch.rewards[0] > 0))
+
+	
+	if score_name == UEDScore.ALICE_AND_BOB_LEAKED_REGRET: 
+		batch.rewards.at[1].set(batch.rewards[1] - (batch.rewards[0] == 0) * batch.rewards[1] * 1/10)
+
+
+	if score_name in [UEDScore.RELATIVE_REGRET, UEDScore.MEAN_RELATIVE_REGRET, UEDScore.POPULATION_REGRET, UEDScore.ALICE_AND_BOB_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_REGRET]:
 		mean_scores, max_scores, score_info = compute_return(batch)
 
 	elif score_name == UEDScore.RETURN:
@@ -110,6 +124,10 @@ def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 
 	elif score_name == UEDScore.NEG_RETURN:
 		batch = batch._replace(rewards=-batch.rewards)
+		mean_scores, max_scores, score_info = compute_return(batch)
+
+	elif score_name == UEDScore.REVERSED_POSITIVE_RETURN:
+		batch = batch._replace(rewards=(batch.rewards > 0) * (1-batch.rewards))
 		mean_scores, max_scores, score_info = compute_return(batch)
 
 	elif score_name == UEDScore.MAX_MC:
@@ -143,6 +161,10 @@ def compute_ued_scores(score_name: UEDScore, batch: namedtuple, n_eval: int, inf
 
 	if score_name == UEDScore.RELATIVE_REGRET:
 		scores = jnp.clip(max_env_returns_per_agent[1] \
+				- mean_env_returns_per_agent[0], 0)
+
+	elif score_name == UEDScore.ALICE_AND_BOB_REGRET:
+		scores = jnp.clip(mean_env_returns_per_agent[1] \
 				- mean_env_returns_per_agent[0], 0)
 
 	elif score_name == UEDScore.MEAN_RELATIVE_REGRET:

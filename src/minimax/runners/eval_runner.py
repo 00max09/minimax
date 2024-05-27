@@ -174,7 +174,7 @@ class EvalRunner:
         action = pi.sample(seed=subrng)
         log_pi = pi.log_prob(action)
         
-        jax.debug.print("--- %s strart seconds ---" % (time.time() - start_time))
+        #jax.debug.print("--- %s strart seconds ---" % (time.time() - start_time))
         
         rng, *vrngs = jax.random.split(rng, self.pop.n_agents+1)
 
@@ -186,7 +186,7 @@ class EvalRunner:
          info, 
          extra) = benv.step(*step_args)
 
-        jax.debug.print("--- %s quatroo seconds ---" % (time.time() - start_time))
+        #jax.debug.print("--- %s quatroo seconds ---" % (time.time() - start_time))
         
         # Add transition to storage
         step = (obs, action, reward, done, log_pi, value)
@@ -196,7 +196,7 @@ class EvalRunner:
         if carry is not None:
             next_carry = jax.vmap(_tree_util.pytree_select)(
                 done, zero_carry, next_carry)
-        jax.debug.print("--- %s half seconds ---" % (time.time() - start_time))
+        #jax.debug.print("--- %s half seconds ---" % (time.time() - start_time))
         if self.render_mode:
             self.viz.render(
                 benv.env.params, 
@@ -205,7 +205,7 @@ class EvalRunner:
             if self.render_mode == 'ipython':
                 self.ipython_display.display(self.viz.window.fig)
                 self.ipython_display.clear_output(wait=True)
-        jax.debug.print("--- %s seconds ---" % (time.time() - start_time))
+        #jax.debug.print("--- %s seconds ---" % (time.time() - start_time))
         return next_state, next_obs, next_carry, done, info, extra
 
     @partial(jax.jit, static_argnums=(0, 2))

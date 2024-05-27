@@ -11,12 +11,13 @@ from .eval_runner import EvalRunner
 from .dr_runner import DRRunner
 from .plr_runner import PLRRunner
 from .paired_runner import PAIREDRunner
-
+from .paired_async_runner import PAIREDASYNCRunner
 
 __all__ = [
 	ExperimentRunner,
 	EvalRunner,
 	DRRunner,
 	PLRRunner,
-	PAIREDRunner
+	PAIREDRunner,
+	PAIREDASYNCRunner
 ]

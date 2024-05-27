@@ -27,12 +27,31 @@ from minimax.util.rl import (
 	VmapTrainState,
 	RolloutStorage,
 	RollingStats,
+	RolloutBatch,
 	UEDScore,
 	compute_ued_scores
 )
+from collections import OrderedDict
 
+def merge_dict(x, y):
+	for a in x.keys() :
+		x[a] = jnp.concatenate([x[a], y[a]])
 
-class PAIREDRunner:
+def merge_batches(x, y):
+	batch_kwargs = dict(
+			obs=merge_dict(x[0], y[0]),
+			actions=jnp.concatenate([x[1], y[1]]),
+			rewards=jnp.concatenate([x[2], y[2]]),
+			dones=jnp.concatenate([x[3], y[3]]),
+			log_pis=jnp.concatenate([x[4], y[4]]),
+			values=jnp.concatenate([x[5], y[5]]),
+			targets=jnp.concatenate([x[6], y[6]]),
+			advantages=jnp.concatenate([x[7], y[7]]),
+			carry=(jnp.concatenate([x[8][0], y[8][0]]),jnp.concatenate([x[8][1], y[8][1]])),
+		)
+	return RolloutBatch(**batch_kwargs)
+		
+class PAIREDASYNCRunner:
 	"""
 	Orchestrates rollouts across one or more students and teachers. 
 	The main components at play:
@@ -107,7 +126,9 @@ class PAIREDRunner:
 		self.n_unroll_rollout = n_unroll_rollout
 		self.render = render
 
-		self.student_pop = AgentPop(student_agents[0], n_agents=n_students)
+
+		self.bob_pop = AgentPop(student_agents[0], n_agents=1) # Maybe to change
+		self.alice_pop = AgentPop(student_agents[0], n_agents=1) # Maybe to change
 
 		if teacher_agents is not None:
 			self.teacher_pop = AgentPop(teacher_agents[0], n_agents=1)
@@ -127,16 +148,28 @@ class PAIREDRunner:
 		self.teacher_n_rollout_steps = \
 			self.benv.env.ued_max_episode_steps()
 
-		self.student_rollout = RolloutStorage(
+		self.alice_rollout = RolloutStorage(
 			discount=discount,
 			gae_lambda=gae_lambda,
 			n_steps=n_rollout_steps,
-			n_agents=n_students,
+			n_agents=1, # may change
 			n_envs=self.n_parallel,
 			n_eval=self.n_eval,
 			action_space=self.benv.env.action_space(),
 			obs_space=self.benv.env.observation_space(),
-			agent=self.student_pop.agent
+			agent=self.alice_pop.agent
+		)
+
+		self.bob_rollout = RolloutStorage(
+			discount=discount,
+			gae_lambda=gae_lambda,
+			n_steps=n_rollout_steps,
+			n_agents=1, # may change
+			n_envs=self.n_parallel,
+			n_eval=self.n_eval,
+			action_space=self.benv.env.action_space(),
+			obs_space=self.benv.env.observation_space(),
+			agent=self.bob_pop.agent
 		)
 
 		self.teacher_rollout = RolloutStorage(
@@ -176,10 +209,19 @@ class PAIREDRunner:
 
 		n_parallel = self.n_parallel*self.n_devices
 
-		rng, student_rng, teacher_rng = jax.random.split(rng,3)
-		student_info = self._reset_pop(
-				student_rng, 
-				self.student_pop, 
+		rng, alice_rng, bob_rng, teacher_rng = jax.random.split(rng,4)
+		alice_info = self._reset_pop(
+				alice_rng, 
+				self.alice_pop, 
+				partial(self.benv.reset, sub_batch_size=n_parallel*self.n_eval),
+				n_parallel_ep=n_parallel*self.n_eval,
+				lr_init=self.lr,
+				lr_final=self.lr_final,
+				lr_anneal_steps=self.lr_anneal_steps)
+
+		bob_info = self._reset_pop(
+				bob_rng, 
+				self.bob_pop, 
 				partial(self.benv.reset, sub_batch_size=n_parallel*self.n_eval),
 				n_parallel_ep=n_parallel*self.n_eval,
 				lr_init=self.lr,
@@ -197,7 +239,8 @@ class PAIREDRunner:
 
 		return (
 			rng,
-			*student_info,
+			*alice_info,
+			*bob_info,
 			*teacher_info
 		)
 
@@ -254,14 +297,14 @@ class PAIREDRunner:
 		_state = list(state)
 		_state[1] = state[1].state_dict
 		_state[6] = state[6].state_dict
-
+		_state[11] = state[11].state_dict
 		return _state
 
 	def load_checkpoint_state(self, runner_state, state):
 		runner_state = list(runner_state)
 		runner_state[1] = runner_state[1].load_state_dict(state[1])
 		runner_state[6] = runner_state[6].load_state_dict(state[6])
-
+		runner_state[11] = runnner_state[11].load_state_dice(state[11])
 		return tuple(runner_state)
 
 	@partial(jax.jit, static_argnums=(0,2,3))
@@ -287,10 +330,10 @@ class PAIREDRunner:
 
 		rng, *vrngs = jax.random.split(rng, pop.n_agents+1)
 
-		if pop is self.student_pop:
+		if pop is self.alice_pop or pop is self.bob_pop:
 			step_fn = self.benv.step_student
 		else:
-			step_fn = self.benv.step_teacher
+			step_fn = self.benv.step_alice_teacher
 		step_args = (jnp.array(vrngs), state, action)
 
 		if reset_state is not None: # Needed for student to reset to same instance
@@ -309,7 +352,7 @@ class PAIREDRunner:
 
 		rollout = rollout_mgr.append(rollout, *step)
 
-		if self.render and pop is self.student_pop:
+		if self.render and pop is self.bob_pop:
 			self.viz.render(
 				self.benv.env.env.params, 
 				jax.tree_util.tree_map(lambda x: x[0][0], state))
@@ -368,7 +411,7 @@ class PAIREDRunner:
 
 			if ep_stats is not None:
 				_ep_stats_update_fn = self._update_ep_stats \
-					if pop is self.student_pop else self._update_ued_ep_stats
+					if pop is self.bob_pop or pop is self.alice_pop else self._update_ued_ep_stats
 
 				ep_stats = _ep_stats_update_fn(ep_stats, done, info)
 
@@ -386,30 +429,45 @@ class PAIREDRunner:
 
 	@partial(jax.jit, static_argnums=(0,))
 	def _compile_stats(self, 
-		update_stats, ep_stats, 
+		bob_update_stats, bob_ep_stats,
+		alice_update_stats, alice_ep_stats, 
 		ued_update_stats, ued_ep_stats,
 		env_metrics=None,
 		grad_stats=None, ued_grad_stats=None):
-		mean_returns_by_student = jax.vmap(lambda x: x.mean())(ep_stats['return'])
+		mean_returns_by_bob = jax.vmap(lambda x: x.mean())(bob_ep_stats['return'])
+		mean_returns_by_alice = jax.vmap(lambda x: x.mean())(alice_ep_stats['return'])
 		mean_returns_by_teacher = jax.vmap(lambda x: x.mean())(ued_ep_stats['return'])
 
-		mean_ep_stats = jax.vmap(lambda info: jax.tree_map(lambda x: x.mean(), info))(
-			{k:ep_stats[k] for k in self.rolling_stats.names}
+		mean_bob_ep_stats = jax.vmap(lambda info: jax.tree_map(lambda x: x.mean(), info))(
+			{k:bob_ep_stats[k] for k in self.rolling_stats.names}
+		)
+		mean_alice_ep_stats = jax.vmap(lambda info: jax.tree_map(lambda x: x.mean(), info))(
+			{k:alice_ep_stats[k] for k in self.rolling_stats.names}
 		)
 		ued_mean_ep_stats = jax.vmap(lambda info: jax.tree_map(lambda x: x.mean(), info))(
 			{k:ued_ep_stats[k] for k in self.ued_rolling_stats.names}
 		)
 
-		student_stats = {
-			f'mean_{k}':v for k,v in mean_ep_stats.items()
+		bob_stats = {
+			f'mean_{k}':v for k,v in mean_bob_ep_stats.items()
 		}
-		student_stats.update(update_stats)
+		bob_stats.update(bob_update_stats)
+
+		
+		alice_stats = {
+			f'mean_{k}':v for k,v in mean_bob_ep_stats.items()
+		}
+		alice_stats.update(alice_update_stats)
 
 		stats = {}
-		for i in range(self.n_students):
-			_student_stats = jax.tree_util.tree_map(lambda x: x[i], student_stats) # for agent0
-			stats.update({f'{k}_a{i}':v for k,v in _student_stats.items()})
+		for i in range(1): #to change
+			_bob_stats = jax.tree_util.tree_map(lambda x: x[i], bob_stats) # for agent0
+			stats.update({f'{k}_bob{i}':v for k,v in _bob_stats.items()})
 
+		for i in range(1): # to change
+			_alice_stats = jax.tree_util.tree_map(lambda x: x[i], alice_stats) # for agent0
+			stats.update({f'{k}_alice{i}':v for k,v in _alice_stats.items()})
+		
 		teacher_stats = {
 			f'mean_{k}_tch':v for k,v in ued_mean_ep_stats.items()
 		}
@@ -417,11 +475,11 @@ class PAIREDRunner:
 			f'{k}_tch':v[0] for k,v in ued_update_stats.items()
 		})
 		stats.update(teacher_stats)
-		
+
 		if self.track_env_metrics:
 			passable_mask = env_metrics.pop('passable')
 			mean_env_metrics = jax.tree_util.tree_map(
-				lambda x: (x*passable_mask).sum()/passable_mask.sum(), 
+				lambda x: jnp.where(passable_mask.sum() > 0, (x*passable_mask).sum()/passable_mask.sum(), 0), 
 				env_metrics
 			)
 			mean_env_metrics.update({'passable_ratio': passable_mask.mean()})
@@ -450,16 +508,22 @@ class PAIREDRunner:
 	def run(
 		self, 
 		rng, 
-		train_state, 
-		state,
-		obs,
-		carry,
-		ep_stats,
+		bob_train_state, 
+		bob_state,
+		bob_obs,
+		bob_carry,
+		bob_ep_stats,
+		alice_train_state,
+		alice_state,
+		alice_obs,
+		alice_carry,
+		alice_ep_stats,
 		ued_train_state,
 		ued_state,
 		ued_obs,
 		ued_carry,
-		ued_ep_stats):
+		ued_ep_stats,
+		):
 		"""
 		Perform one update step: rollout teacher + students
 		"""
@@ -502,52 +566,104 @@ class PAIREDRunner:
 
 		# === Reset student to new envs + rollout students
 		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
-		obs, state, extra = jax.tree_util.tree_map(
+		alice_obs, alice_start_state, alice_extra = jax.tree_util.tree_map(
 			lambda x:x.squeeze(0), self.benv.reset_student(
 				jnp.array(vrngs),
 				ued_state, 
-				self.student_pop.n_agents))
-		reset_state = state
-
+				self.alice_pop.n_agents)) 
+				# jeśli dobrze rozumiem z jakiegoś powodu to jest nie vmapowane
+		alice_reset_state = alice_state
 		# Reset student ep_stats
-		st_rollout_batch_shape = (self.n_students,self.n_parallel*self.n_eval)
+		st_rollout_batch_shape = (1,self.n_parallel*self.n_eval)
 		ep_stats = self.rolling_stats.reset_stats(
 			batch_shape=st_rollout_batch_shape)
 
+		# Rollout Alice
 		done = jnp.zeros(st_rollout_batch_shape, dtype=jnp.bool_)
 		rng, subrng = jax.random.split(rng)
-		rollout, state, obs, carry, extra, ep_stats = \
+		alice_rollout, alice_state, alice_obs, alice_carry, _, alice_ep_stats = \
 			self._rollout(
 				subrng, 
-				self.student_pop,
-				self.student_rollout,
+				self.alice_pop,
+				self.alice_rollout,
 				self.n_rollout_steps,
-				jax.lax.stop_gradient(train_state.params),
-				state, 
-				obs, 
-				carry, 
+				jax.lax.stop_gradient(alice_train_state.params),
+				alice_start_state, 
+				alice_obs, 
+				alice_carry, 
 				done,
-				reset_state=reset_state, 
-				extra=extra, 
-				ep_stats=ep_stats)
+				reset_state=alice_reset_state, 
+				extra=alice_extra, 
+				ep_stats=alice_ep_stats)
 
-		# === Update student with PPO
+		# Add rewards
+		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
+		bob_obs, bob_start_state, bob_extra = jax.tree_util.tree_map(
+			lambda x:x.squeeze(0), self.benv.reset_student(
+				jnp.array(vrngs),
+				ued_state, 
+				self.bob_pop.n_agents)) 
+
+		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
+		_, bob_reset_state = self.benv.add_reward_structure_for_bob(
+				jnp.array(vrngs),
+				alice_reset_state, 
+				alice_state) #???? nie wiem
+				
+		# Bob rollout
+		rng, subrng = jax.random.split(rng)
+		bob_rollout, bob_state, bob_obs, bob_carry, bob_extra, bob_ep_stats = \
+			self._rollout(
+				subrng, 
+				self.bob_pop,
+				self.bob_rollout,
+				self.n_rollout_steps,
+				jax.lax.stop_gradient(bob_train_state.params),
+				bob_start_state, 
+				bob_obs, 
+				bob_carry, 
+				done,
+				reset_state=bob_reset_state, 
+				extra=bob_extra, 
+				ep_stats=bob_ep_stats)
+
+		# === Update Bob with PPO
 		# PPOAgent vmaps over the train state and batch. Batch must be N x EM
-		student_rollout_last_value = self.student_pop.get_value(
-			jax.lax.stop_gradient(train_state.params), obs, carry
+		bob_rollout_last_value = self.bob_pop.get_value(
+			jax.lax.stop_gradient(bob_train_state.params), bob_obs, bob_carry
 		)
-		train_batch = self.student_rollout.get_batch(
-			rollout, 
-			student_rollout_last_value
+		bob_train_batch = self.bob_rollout.get_batch(
+			bob_rollout, 
+			bob_rollout_last_value
 		)
+		rng, subrng = jax.random.split(rng)
+		bob_train_state, bob_update_stats = self.bob_pop.update(subrng, bob_train_state, bob_train_batch)
+		
+
+		# === Update Alice with PPO
+
+
+		alice_score, _ = compute_ued_scores(UEDScore.REVERSED_POSITIVE_RETURN, bob_train_batch, self.n_eval)
+		alice_rollout = self.alice_rollout.set_final_reward(alice_rollout, alice_score)
+		alice_train_batch = self.alice_rollout.get_batch(
+			alice_rollout, 
+			jnp.zeros((1, self.n_parallel)) # Last step terminates episode
+		)
+
+		# ued_ep_stats = self._update_ued_ep_stats(
+		# 	ued_ep_stats, 
+		# 	jnp.ones((1,len(ued_score),1), dtype=jnp.bool_),
+		# 	{'return': jnp.expand_dims(ued_score, (0,-1))}
+		# )
 
 		rng, subrng = jax.random.split(rng)
-		train_state, update_stats = self.student_pop.update(subrng, train_state, train_batch)
+		alice_train_state, alice_update_stats = self.alice_pop.update(subrng, alice_train_state, alice_train_batch)
 
 		# === Update teacher with PPO
 		# - Compute returns per env per agent
 		# - Compute batched returns based on returns per env per agent
-		ued_score, _ = compute_ued_scores(self.ued_score, train_batch, self.n_eval)
+		alice_bob_train_batch = merge_batches(bob_train_batch, alice_train_batch)
+		ued_score, _ = compute_ued_scores(self.ued_score, alice_bob_train_batch, self.n_eval)
 		ued_rollout = self.teacher_rollout.set_final_reward(ued_rollout, ued_score)
 		ued_train_batch = self.teacher_rollout.get_batch(
 			ued_rollout, 
@@ -559,7 +675,6 @@ class PAIREDRunner:
 			jnp.ones((1,len(ued_score),1), dtype=jnp.bool_),
 			{'return': jnp.expand_dims(ued_score, (0,-1))}
 		)
-
 		# Update teacher, batch must be 1 x Ex1
 		rng, subrng = jax.random.split(rng)
 		ued_train_state, ued_update_stats = self.teacher_pop.update(subrng, ued_train_state, ued_train_batch)
@@ -567,26 +682,33 @@ class PAIREDRunner:
 		# --------------------------------------------------
 		# Collect metrics
 		if self.track_env_metrics:
-			env_metrics = self.benv.get_env_metrics(reset_state)
+			env_metrics = self.benv.get_env_metrics(bob_reset_state)
 		else:
 			env_metrics = None
 
 		grad_stats, ued_grad_stats = None, None
 
 		stats = self._compile_stats(
-			update_stats, ep_stats, 
+			bob_update_stats, bob_ep_stats, 
+			alice_update_stats, alice_ep_stats,
 			ued_update_stats, ued_ep_stats,
 			env_metrics,
 			grad_stats, ued_grad_stats)
-		stats.update(dict(n_updates=train_state.n_updates[0]))
+		
 
-		train_state = train_state.increment()
+		stats.update(dict(n_updates=bob_train_state.n_updates[0]))
+		
+		bob_train_state = bob_train_state.increment()
 		ued_train_state = ued_train_state.increment()
+		alice_train_state = alice_train_state.increment()
+		
+		
 		self.n_updates += 1
-
+		
 		return (
 			stats, 
 			rng,
-			train_state, state, obs, carry, ep_stats,
+			bob_train_state, bob_state, bob_obs, bob_carry, bob_ep_stats,
+			alice_train_state, alice_state, alice_obs, alice_carry, alice_ep_stats,
 			ued_train_state, ued_state, ued_obs, ued_carry, ued_ep_stats
 		)
