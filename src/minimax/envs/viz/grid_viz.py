@@ -24,6 +24,7 @@ from minimax.envs.maze.maze import OBJECT_TO_INDEX, COLOR_TO_INDEX, COLORS
 INDEX_TO_COLOR = [k for k,v in COLOR_TO_INDEX.items()]
 TILE_PIXELS = 32
 
+		
 
 class GridVisualizer:
 	"""

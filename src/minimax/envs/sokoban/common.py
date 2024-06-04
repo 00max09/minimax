@@ -8,7 +8,7 @@ import chex
 
 
 COLORS = {
-    'black' : jnp.array([0,0,0]),
+    'grey_wall' : jnp.array([192,192,192]),
     'red'   : jnp.array([255, 0, 0]),
     'green' : jnp.array([0, 255, 0]),
     'blue'  : jnp.array([0, 0, 255]),
@@ -18,8 +18,8 @@ COLORS = {
 }
 
 OBJECT_TO_INDEX = {
-	"empty": 0,
-	"player": 1,
+	"wall": 0,
+	"empty": 1,
 	"target": 2,
 	"box_target": 3,
 	"box": 4,
@@ -28,6 +28,25 @@ OBJECT_TO_INDEX = {
 }
 
 
+COLOR_TO_INDEX = {
+    'grey_wall' : 0,
+    'red'   : 1,
+    'green' : 2,
+    'blue'  : 3,
+    'purple': 4,
+    'yellow': 5,
+    'grey'  : 6,
+}
+
+
+# Map of agent direction indices to vectors
+DIR_TO_VEC = jnp.array([
+	# Pointing right (positive X)
+	(1, 0), # right
+	(0, 1), # down
+	(-1, 0), # left
+	(0, -1), # up
+], dtype=jnp.int8)
 
 @struct.dataclass
 class EnvInstance:

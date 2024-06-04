@@ -142,8 +142,8 @@ class EvalRunner:
 
         self.render_mode = render_mode
         if render_mode:
-            from minimax.envs.viz.grid_viz import GridVisualizer
-            self.viz = GridVisualizer()
+            from minimax.envs.viz.soko_grid_viz import SokobanGridVisualizer
+            self.viz = SokobanGridVisualizer()
             #self.viz.show()
 
             if render_mode == 'ipython':

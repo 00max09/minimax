@@ -239,7 +239,7 @@ class Sokoban(environment.Environment):
         one_hot = state.maze_map
         
     
-        #jax.debug.print("pre move maze map : {}",jnp.argmax(one_hot,axis=2))
+        jax.debug.print("pre move maze map : {}",jnp.argmax(one_hot,axis=2))
         agent_pos = state.agent_pos
         unmatched_boxes = state.unmatched_boxes
 
@@ -249,7 +249,7 @@ class Sokoban(environment.Environment):
             index_x = agent_pos[0] + i * delta_x
             index_y = agent_pos[1] + i * delta_y
             is_in_place = jnp.logical_and(
-                jnp.logical_and(index_x < one_hot.shape[0], index_y < one_hot.shape[0]),
+                jnp.logical_and(index_x < one_hot.shape[0], index_y < one_hot.shape[1]),
                 jnp.logical_and(index_x >= 0, index_y >= 0),
             )
             def _find_pos(_):
@@ -279,7 +279,7 @@ class Sokoban(environment.Environment):
 
         box_moves = jnp.logical_and(
             jnp.logical_or(arena[1] == box, arena[1] == box_target),
-            jnp.logical_or(arena[2] == empty, arena[2] == 2),
+            jnp.logical_or(arena[2] == empty, arena[2] == target),
         )
 
         agent_moves = jnp.logical_or(
@@ -345,9 +345,16 @@ class Sokoban(environment.Environment):
             # if index_x < one_hot.shape[0] and index_y < one_hot.shape[0]:
             one_hot_field = jnp.zeros(shape=7)
             one_hot_field = one_hot_field.at[new_arena__[i]].set(1)
-            new_one_hot = new_one_hot.at[index_x, index_y, :].set(
-                one_hot_field, mode="drop"
+            is_in_place = jnp.logical_and(
+                jnp.logical_and(index_x < one_hot.shape[0], index_y < one_hot.shape[1]),
+                jnp.logical_and(index_x >= 0, index_y >= 0),
             )
+            new_one_hot = jax.lax.cond(
+                is_in_place,
+                lambda *x: new_one_hot.at[index_x, index_y, :].set(one_hot_field, mode="drop"),
+                lambda *x: new_one_hot,
+                None,)
+             
 
         done = new_unmatched_boxes__ == 0
         # reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
@@ -355,7 +362,7 @@ class Sokoban(environment.Environment):
         
         #jax.debug.print("move {} {}",delta_x, delta_y)
         
-        #jax.debug.print("post move maze map : {}",jnp.argmax(new_one_hot,axis=2))
+        jax.debug.print("post move maze map : {}",jnp.argmax(new_one_hot,axis=2))
         
         #jax.debug.print("move reward: {}", reward)
         return (
