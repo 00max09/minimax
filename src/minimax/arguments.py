@@ -141,7 +141,11 @@ parser.add_dependent_argument(
         'value_disagreement',
         'alice_and_bob_regret',
         'alice_and_bob_leaked_regret',
-        'paired_async'
+        'paired_async',
+        'alice_and_bob_leaked_squared',
+        'alice_only',
+        'alice_mid',
+        'alice_mid_squared'
     ],
     help='UED score of agent.')
 

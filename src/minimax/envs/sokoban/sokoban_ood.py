@@ -195,7 +195,7 @@ class MiniMaze(SokobanSingleton):
         room = jnp.squeeze(jnp.eye(7, dtype=jnp.uint8)[room.reshape(-1)]).reshape(
             room.shape + (7,)
         )
-        jax.debug.print("room {}", room)
+        #jax.debug.print("room {}", room)
         return room
     # def step_env(self,
     #              key: chex.PRNGKey,

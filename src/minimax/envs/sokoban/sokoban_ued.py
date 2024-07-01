@@ -155,7 +155,7 @@ class UEDSokoban(environment.Environment):
                     #self.n_clutter_placed += 1
 
         state.time += 1 #self.adversary_step_count += 1
-        print(state.maze_map, file=sys.stderr)
+        #print(state.maze_map, file=sys.stderr)
         # End of episode
         if state.time >= params.n_walls + 3:
             done = True

@@ -239,7 +239,7 @@ class Sokoban(environment.Environment):
         one_hot = state.maze_map
         
     
-        jax.debug.print("pre move maze map : {}",jnp.argmax(one_hot,axis=2))
+        #jax.debug.print("pre move maze map : {}",jnp.argmax(one_hot,axis=2))
         agent_pos = state.agent_pos
         unmatched_boxes = state.unmatched_boxes
 
@@ -357,12 +357,12 @@ class Sokoban(environment.Environment):
              
 
         done = new_unmatched_boxes__ == 0
-        # reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
-        reward = 10 * done
+        #reward = 0.1 - 1*((new_unmatched_boxes_.astype(float) - unmatched_boxes.astype(float))) #0.1 - params.reward_box_on_target * (float(new_unmatched_boxes_) - float(unmatched_boxes))
+        reward = done * (250-state.time)
         
         #jax.debug.print("move {} {}",delta_x, delta_y)
         
-        jax.debug.print("post move maze map : {}",jnp.argmax(new_one_hot,axis=2))
+        #jax.debug.print("post move maze map : {}",jnp.argmax(new_one_hot,axis=2))
         
         #jax.debug.print("move reward: {}", reward)
         return (

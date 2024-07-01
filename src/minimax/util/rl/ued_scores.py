@@ -29,7 +29,10 @@ class UEDScore(Enum):
 	ALICE_AND_BOB_REGRET = 10
 	ALICE_AND_BOB_LEAKED_REGRET = 11
 	REVERSED_POSITIVE_RETURN = 12
-
+	ALICE_AND_BOB_LEAKED_SQUARED = 13
+	ALICE_ONLY = 14
+	ALICE_MID = 15
+	ALICE_MID_SQUARED = 16
 
 
 @partial(jax.jit, static_argnums=(2,3))
@@ -116,7 +119,7 @@ def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 		batch.rewards.at[1].set(batch.rewards[1] - (batch.rewards[0] == 0) * batch.rewards[1] * 1/10)
 
 
-	if score_name in [UEDScore.RELATIVE_REGRET, UEDScore.MEAN_RELATIVE_REGRET, UEDScore.POPULATION_REGRET, UEDScore.ALICE_AND_BOB_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_REGRET]:
+	if score_name in [UEDScore.RELATIVE_REGRET, UEDScore.MEAN_RELATIVE_REGRET, UEDScore.POPULATION_REGRET, UEDScore.ALICE_AND_BOB_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_SQUARED, UEDScore.ALICE_ONLY, UEDScore.ALICE_MID, UEDScore.ALICE_MID_SQUARED]:
 		mean_scores, max_scores, score_info = compute_return(batch)
 
 	elif score_name == UEDScore.RETURN:
@@ -130,6 +133,7 @@ def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 		batch = batch._replace(rewards=(batch.rewards > 0) * (1-batch.rewards))
 		mean_scores, max_scores, score_info = compute_return(batch)
 
+	
 	elif score_name == UEDScore.MAX_MC:
 		mean_scores, max_scores, score_info = compute_max_mc(batch, info)
 
@@ -170,7 +174,15 @@ def compute_ued_scores(score_name: UEDScore, batch: namedtuple, n_eval: int, inf
 	elif score_name == UEDScore.MEAN_RELATIVE_REGRET:
 		scores = jnp.clip(mean_env_returns_per_agent[1] \
 				- mean_env_returns_per_agent[0], 0)
-
+	elif score_name == UEDScore.ALICE_AND_BOB_LEAKED_SQUARED:
+		scores = mean_env_returns_per_agent[1] * 0.9 * mean_env_returns_per_agent[1] + mean_env_returns_per_agent[0]
+	elif score_name == UEDScore.ALICE_ONLY:
+		scores = mean_env_returns_per_agent[0]
+	elif score_name == UEDScore.ALICE_MID:
+		scores = jnp.abs(0.5-mean_env_returns_per_agent[0])
+	
+	elif score_name == UEDScore.ALICE_MID_SQUARED:
+		scores = jnp.abs(0.5-mean_env_returns_per_agent[0])**2
 	elif score_name == UEDScore.POPULATION_REGRET:
 		max_env_returns = max_env_returns_per_agent.max(0)
 		mean_env_returns = mean_env_returns_per_agent.mean(0)

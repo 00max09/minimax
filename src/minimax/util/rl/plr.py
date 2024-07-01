@@ -14,7 +14,7 @@ from jax.sharding import PartitionSpec as P
 from flax import struct
 import chex
 import numpy as np
-
+import wandb as wandb
 from .ued_scores import UEDScore
 
 
@@ -383,13 +383,20 @@ class PLRManager:
 		weighted_n_mutations = (plr_buffer.n_mutations*replay_dist).sum()
 		scores = jnp.where(plr_buffer.filled, plr_buffer.scores, 0)
 		weighted_ued_score = (scores*replay_dist).sum()
-
+		median_ued_score = jnp.median(scores)
+		ued_score_variance = jnp.var(scores)
+		ued_score_mean = jnp.mean(scores)
+		list_of_scores = list(scores)
 		weighted_age = (plr_buffer.ages*replay_dist).sum()
 
 		return dict(
 			weighted_n_mutations=weighted_n_mutations,
 			weighted_ued_score=weighted_ued_score,
-			weighted_age=weighted_age
+			weighted_age=weighted_age,
+			median_ued_score=median_ued_score,
+			ued_score_variance=ued_score_variance,
+			ued_score_mean=ued_score_mean,
+			list_of_scores = list_of_scores
 		)
 
 

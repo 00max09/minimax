@@ -22,6 +22,7 @@ import datetime
 import copy
 import logging
 import git
+import wandb as wandb
 from typing import Dict
 
 import minimax.util.checkpoint as _checkpoint_util
@@ -151,7 +152,11 @@ class Logger:
 			self._stdout = HumanOutputFormat(sys.stdout)
 
 		self._callback = callback
-
+		if callback is not None:
+			self.plr_score_art = wandb.Artifact("plr_scores", "example2", incremental=True)
+			self.parts_dir_art = "{}_parts".format("plr_scores")
+			tab = wandb.data_types.PartitionedTable(self.parts_dir_art)
+			self.plr_score_art.add(tab, "plr_scores")
 		formatter = logging.Formatter("%(message)s")
 		self._logger = logging.getLogger("logs/out")
 		shandle = logging.StreamHandler()
@@ -230,27 +235,43 @@ class Logger:
 			'_time': time.time()
 		}
 		_stats.update(stats)
+		
 		stats = _stats
 
+
+
+		stats2 = {k: v for k, v in stats.items() if k!="plr_list_of_scores"}
+
 		if self._logwriter is None:
-			fieldnames = list(stats.keys())
+			fieldnames = list(stats2.keys())
 			self._logwriter = csv.DictWriter(self._logfile, fieldnames=fieldnames)
 
 		if _tick > self._last_logged_tick \
 			or not self.append_to_existing_logs:
 			if self._last_n_logged_lines == 0:
-				fieldnames = list(stats.keys())
+				fieldnames = list(stats2.keys())
 				self._logfile.write("# %s\n" % ",".join(fieldnames))
 				self._logfile.flush()
 				self._last_n_logged_lines = 1
 
-			self._logwriter.writerow(stats)
+			self._logwriter.writerow(stats2)
 			self._logfile.flush()
 
 			if self._callback is not None:
-				self._callback(stats)
+				if 'plr_list_of_scores' in stats.keys():
+					print("górwo", flush=True)
+					vals = list(stats['plr_list_of_scores'])
+					vals = list(zip([_tick]*len(vals) , vals))
+					table = wandb.Table(data=vals, columns = ["tick", "score"])
+					tab_path = "{}/tab_{}".format(self.parts_dir_art, _tick)
+					gowno = self.plr_score_art.add(table, tab_path)
+					print(gowno, flush=True)
+					#stats['plr_list_of_scores'] = wandb.plot.scatter(table, "class_x", "class_y")
+
+				self._callback(stats2)
 
 		if self.verbose:
+
 			self._stdout.writekvs(stats)
 
 	@property
