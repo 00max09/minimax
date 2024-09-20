@@ -20,12 +20,9 @@ import minimax.config.xpid_maker as xpid_maker
 def get_wandb_config():
 	wandb_config_path = os.path.join(os.path.abspath(os.getcwd()), 'config', 'wandb.json')
 	if os.path.exists(wandb_config_path):
-		print("siema4")
 		with open(wandb_config_path, 'r') as config_file:
-			print("siema5")
 			config = json.load(config_file)
 			if len(config) == 2:
-				print("siema6")
 				return {
 					'wandb_base_url': config['base_url'],
 					'wandb_api_key': config['api_key'],
@@ -161,9 +158,16 @@ def parse_args():
 		help='wandb project name')
 
 	parser.add_argument(
+		'--wandb_entity',
+		type=str,
+		default=None,
+		help='wandb entity')
+
+	parser.add_argument(
 		'--include_wandb_group',
 		action="store_true",
 		help='Whether to include wandb group in cmds.')
+	
 
 	return parser.parse_args()
 
@@ -232,7 +236,7 @@ if __name__ == '__main__':
 
 	grid_path = os.path.join(os.path.expandvars(os.path.expanduser(args.dir)), json_filename)
 	config = json.load(open(grid_path))
-	cmd = config.get('cmd', 'train')
+	cmd = config.get('cmd', 'minimax.train')
 	grid = config['args']
 	xpid_prefix = '' if 'xpid_prefix' not in config else config['xpid_prefix']
 
@@ -241,14 +245,13 @@ if __name__ == '__main__':
 
 	if 'wandb_project' in grid:	
 		params['wandb_project'] = args.wandb_project
-		
 		if args.wandb_base_url:
-			print("siema1")
 			params['wandb_base_url'] = args.wandb_base_url
 		if args.wandb_api_key:
-			print("siema2")
 			params['wandb_api_key'] = args.wandb_api_key
-		print("siema3")
+		if args.wandb_entity:
+			params['wandb_entity'] = args.wandb_entity
+		
 		params.update(get_wandb_config())
 
 	# Generate all parameter combinations within grid, using defaults for fixed params

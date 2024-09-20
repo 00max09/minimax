@@ -15,7 +15,7 @@ from collections import namedtuple, OrderedDict
 from typing import Tuple, Optional
 
 from .common import EnvInstance, render
-
+from .sokoban_level_generator import SokobanRoomGenerator
 
 class Actions(IntEnum):
     left = 0
@@ -76,7 +76,7 @@ class Sokoban(environment.Environment):
         seed=None,
     ):
         super().__init__()
-        self.obs_shape = (height, width, 3)
+        self.obs_shape = (height, width, 7)
         self.action_set = jnp.array(
             [Actions.left, Actions.right, Actions.up, Actions.down]
         )
@@ -97,6 +97,12 @@ class Sokoban(environment.Environment):
             # reward_box_on_target = reward_box_on_target,
             # reward_finished = reward_finished,
         )
+        
+
+        with open('/net/people/plgrid/plgmaksgro/minimax/src/minimax/envs/sokoban/keyset.txt') as f:
+            self.keyset = f.read().splitlines()
+            self.keyset = jnp.asarray(list(map(int, self.keyset)))
+
 
         # Penalties and Rewards
         # self.penalty_box_off_target = penalty_box_off_target
@@ -139,6 +145,18 @@ class Sokoban(environment.Environment):
         # return (self._internal_state.one_hot, rew, done, {"solved": done}
 
     def reset_env(self, key: chex.PRNGKey) -> Tuple[chex.Array, EnvState]:
+        x = jax.random.randint(key, (), 0, len(self.keyset))
+        new_key = jax.random.PRNGKey(self.keyset[x])
+        return self.reset_env_my(new_key)
+
+    def reset_env_org_gen(self, key: chex.PRNGKey) -> Tuple[chex.Array, EnvState]:
+        room_gen = SokobanRoomGenerator(key)
+        room = room_gen.generate_room((self.params.height, self.params.width))
+        room = one_hot()
+
+
+
+    def reset_env_my(self, key: chex.PRNGKey) -> Tuple[chex.Array, EnvState]:
         params = self.params
         map_size = params.width * params.height
         agent_pos = jax.random.randint(key, (), 0, map_size-3)
@@ -201,11 +219,11 @@ class Sokoban(environment.Environment):
     def get_obs(self, state: EnvState) -> chex.Array:
         """Return grid view."""
 
-        image = render(self.params, state.maze_map).astype(jnp.uint8)
-        if self.params.normalize_obs:
-           image = image/10.0
+        #image = render(self.params, state.maze_map).astype(jnp.uint8)
+        #if self.params.normalize_obs:
+        #   image = image/10.0
 
-        obs_dict = dict(image=image)
+        obs_dict = dict(image=state.maze_map)
 
         return OrderedDict(obs_dict)
 

@@ -56,6 +56,13 @@ def _get_ued_runner_info(p):
 		ued_score = 'mm'
 	elif p.ued_score == 'value_disagreement':
 		ued_score = 'vd'
+	elif p.ued_score == 'alice_and_bob_leaked_squared':
+		ued_score = 'alice_and_bob_leaked_squared'
+	elif p.ued_score == 'alice_only':
+		ued_score = 'alice_only_random'
+	elif p.ued_score == 'alice_mid':
+		ued_score = 'alice_mid'
+		
 	else:
 		raise ValueError(f'Unsupported ued_score {ued_score}')
 
@@ -127,7 +134,7 @@ def _get_env_info_maze_ued(p):
 		placement_info = f"{placement_info}b"
 	if len(placement_info) > 0:
 		placement_info = f"_{placement_info}"
-	info = f"{info}{placement_info}"
+	info = f"{info}{placement_info}randomgoal"
 
 	return f"{p.env_name}{p.maze_height}x{p.maze_width}w{p.maze_n_walls}{info}"
 
@@ -299,6 +306,7 @@ RUNNER_INFO_HANDLERS = {
 	'dr': _get_runner_info_dr,
 	'plr': _get_plr_runner_info,
 	'paired': _get_runner_info_paired,
+	'paired_async': _get_runner_info_paired,
 }
 
 ENV_INFO_HANDLERS = {

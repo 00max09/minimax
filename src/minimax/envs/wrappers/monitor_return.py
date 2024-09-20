@@ -68,3 +68,38 @@ class MonitorReturnWrapper(EnvWrapper):
 		extra['ep_return'] *= (1-done)
 
 		return obs, state, reward, done, info, extra
+
+
+	def step_alice(
+		self,
+		key: chex.PRNGKey,
+		state: EnvState,
+		action: Union[int, float],
+		reset_state: Optional[chex.ArrayTree] = None,
+		extra: dict = None,
+	) -> Tuple[chex.Array, EnvState, float, bool]:
+		step_kwargs = dict(
+			reset_state=reset_state
+		)
+		if self._wrap_level > 1:
+			step_kwargs.update(dict(
+				extra=extra
+			))
+
+		step = self._env.step_alice(
+				key, 
+				state, 
+				action, 
+				**step_kwargs)
+
+		if len(step) == 5:
+			obs, state, reward, done, info = step
+		else:
+			obs, state, reward, done, info, extra = step
+
+		# Track returns
+		extra['ep_return'] += reward
+		info['return'] = done*extra['ep_return']
+		extra['ep_return'] *= (1-done)
+
+		return obs, state, reward, done, info, extra

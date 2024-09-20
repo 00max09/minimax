@@ -386,7 +386,7 @@ class PLRManager:
 		median_ued_score = jnp.median(scores)
 		ued_score_variance = jnp.var(scores)
 		ued_score_mean = jnp.mean(scores)
-		list_of_scores = list(scores)
+		#list_of_scores = list(scores)
 		weighted_age = (plr_buffer.ages*replay_dist).sum()
 
 		return dict(
@@ -396,7 +396,7 @@ class PLRManager:
 			median_ued_score=median_ued_score,
 			ued_score_variance=ued_score_variance,
 			ued_score_mean=ued_score_mean,
-			list_of_scores = list_of_scores
+		#	list_of_scores = list_of_scores
 		)
 
 

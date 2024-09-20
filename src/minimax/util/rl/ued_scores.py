@@ -115,8 +115,8 @@ def _compute_ued_scores(score_name: UEDScore, batch: namedtuple, info=None):
 		batch.rewards.at[1].set(batch.rewards[1] * (batch.rewards[0] > 0))
 
 	
-	if score_name == UEDScore.ALICE_AND_BOB_LEAKED_REGRET: 
-		batch.rewards.at[1].set(batch.rewards[1] - (batch.rewards[0] == 0) * batch.rewards[1] * 1/10)
+	#if score_name == UEDScore.ALICE_AND_BOB_LEAKED_REGRET: 
+	#	batch.rewards.at[1].set(batch.rewards[1] - (batch.rewards[0] == 0) * batch.rewards[1] * 1/10)
 
 
 	if score_name in [UEDScore.RELATIVE_REGRET, UEDScore.MEAN_RELATIVE_REGRET, UEDScore.POPULATION_REGRET, UEDScore.ALICE_AND_BOB_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_REGRET, UEDScore.ALICE_AND_BOB_LEAKED_SQUARED, UEDScore.ALICE_ONLY, UEDScore.ALICE_MID, UEDScore.ALICE_MID_SQUARED]:
@@ -175,11 +175,11 @@ def compute_ued_scores(score_name: UEDScore, batch: namedtuple, n_eval: int, inf
 		scores = jnp.clip(mean_env_returns_per_agent[1] \
 				- mean_env_returns_per_agent[0], 0)
 	elif score_name == UEDScore.ALICE_AND_BOB_LEAKED_SQUARED:
-		scores = mean_env_returns_per_agent[1] * 0.9 * mean_env_returns_per_agent[1] + mean_env_returns_per_agent[0]
+		scores = mean_env_returns_per_agent[0] * 0.5 * mean_env_returns_per_agent[0] + mean_env_returns_per_agent[1]
 	elif score_name == UEDScore.ALICE_ONLY:
-		scores = mean_env_returns_per_agent[0]
+		scores = mean_env_returns_per_agent[1]
 	elif score_name == UEDScore.ALICE_MID:
-		scores = jnp.abs(0.5-mean_env_returns_per_agent[0])
+		scores = 0.5-jnp.abs(0.5-mean_env_returns_per_agent[1])
 	
 	elif score_name == UEDScore.ALICE_MID_SQUARED:
 		scores = jnp.abs(0.5-mean_env_returns_per_agent[0])**2

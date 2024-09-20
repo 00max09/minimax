@@ -94,7 +94,10 @@ class Maze(environment.Environment):
 		singleton_seed=-1
 	):
 		super().__init__()
-
+		# with open('/net/people/plgrid/plgmaksgro/minimax/src/minimax/envs/maze/keyset.txt') as f:
+		# 	self.keyset = f.read().splitlines()
+		# 	self.keyset = jnp.asarray(list(map(int, self.keyset)))
+		
 		self.obs_shape = (agent_view_size, agent_view_size, 3)
 		self.action_set = jnp.array([
 			Actions.left,
@@ -148,7 +151,12 @@ class Maze(environment.Environment):
 			{},
 		)
 
-	def reset_env(
+	def reset_env(self, key: chex.PRNGKey) -> Tuple[chex.Array, EnvState]:
+		#x = jax.random.randint(key, (), 0, len(self.keyset))
+		#new_key = jax.random.PRNGKey(self.keyset[x])
+		return self._reset_env(key)
+	
+	def _reset_env(
 		self, 
 		key: chex.PRNGKey, 
 	) -> Tuple[chex.Array, EnvState]:
@@ -358,11 +366,7 @@ class Maze(environment.Environment):
 			reward
 		)
 	
-	def add_reward_structure_for_bob(self, key:chex.PRNGKey, base_state : EnvState, alice_final_state : EnvState) -> Tuple[chex.Array, EnvState]:
-		new_state = base_state
-		new_state = new_state.replace(goal_pos=alice_final_state.agent_pos)
-		return self.get_obs(new_state), new_state
-
+	
 	def is_terminal(self, state: EnvState) -> bool:
 		"""Check whether state is terminal."""
 		done_steps = state.time >= self.params.max_episode_steps
@@ -430,7 +434,7 @@ class Maze(environment.Environment):
 			state.agent_pos,
 			state.goal_pos
 		)
-
+		#jax.debug.print("{}", shortest_path_length)
 		return dict(
 			n_walls=n_walls,
 			shortest_path_length=shortest_path_length,

@@ -80,7 +80,7 @@ class UEDMaze(environment.Environment):
 
 		self.n_tiles = height*width
 		self.action_set = jnp.array(jnp.arange(self.n_tiles)) # go straight, turn left, turn right, take action
-
+		self.is_alice_env = False
 		self.params = EnvParams(
 			height=height,
 			width=width,
@@ -180,8 +180,8 @@ class UEDMaze(environment.Environment):
 		all_pos = jnp.arange(self.n_tiles, dtype=jnp.uint32)
 
 		# Only mark collision if replace_wall_pos=False OR the agent is placed over the goal
-		goal_step_idx = last_wall_step_idx + 1
-		agent_step_idx = last_wall_step_idx + 2
+		goal_step_idx = last_wall_step_idx + 2
+		agent_step_idx = last_wall_step_idx + 1
 
 		# Track whether it is the last time step
 		next_state = state.replace(time=state.time + 1)
@@ -198,15 +198,19 @@ class UEDMaze(environment.Environment):
 			jnp.logical_or(
 				not params.replace_wall_pos,
 				jnp.logical_and( # agent pos cannot override goal
-					jnp.equal(state.time, agent_step_idx),
-					jnp.equal(state.encoding[goal_step_idx], action)
+					jnp.equal(state.time, goal_step_idx),
+					jnp.equal(state.encoding[agent_step_idx], action)
 				)
 			)
 		)
+
 		collision = (collision * (1-is_agent_dir_step)).astype(jnp.uint32)
 
+		#collision = jnp.logical_or(collision, jnp.equal(state.time, goal_step_idx)) ### TEMP
 		action = (1-collision)*action + \
-			collision*jax.random.choice(collision_rng, all_pos, replace=False, p=pos_dist)
+			collision*jax.random.choice(collision_rng, all_pos, replace=False, p=pos_dist) ### ORG
+		#action = (1-collision)*action + \
+		# 	collision*30000 ### NO RAND
 
 		enc_idx = (1-is_agent_dir_step)*state.time + is_agent_dir_step*(-1)
 		encoding = state.encoding.at[enc_idx].set(action)
@@ -237,6 +241,8 @@ class UEDMaze(environment.Environment):
 		Take a design step. 
 			action: A pos as an int from 0 to (height*width)-1
 		"""
+		self.is_alice_env = True
+		#jax.debug.print("xd {}", action)
 		params = self.params
 
 		collision_rng, noise_rng = jax.random.split(key)
@@ -268,11 +274,11 @@ class UEDMaze(environment.Environment):
 		all_pos = jnp.arange(self.n_tiles, dtype=jnp.uint32)
 
 		# Only mark collision if replace_wall_pos=False OR the agent is placed over the goal
-		agent_step_idx = last_wall_step_idx + 2
+		agent_step_idx = last_wall_step_idx + 1
 
 		# Track whether it is the last time step
 		next_state = state.replace(time=state.time + 1)
-		done = self.is_terminal(next_state)
+		done = agent_step_idx == state.time #self.is_terminal(next_state)
 
 		# Always place agent idx in last enc position.
 		is_agent_dir_step = jnp.logical_and(
@@ -291,7 +297,7 @@ class UEDMaze(environment.Environment):
 
 		enc_idx = (1-is_agent_dir_step)*state.time + is_agent_dir_step*(-1)
 		encoding = state.encoding.at[enc_idx].set(action)
-
+		# print(encoding, flush=True)
 		next_state = next_state.replace(
 			encoding=encoding,
 			terminal=done
@@ -322,15 +328,16 @@ class UEDMaze(environment.Environment):
 		h = params.height
 		w = params.width
 		enc = state.encoding
-
+		#print(enc, flush=True)
 		# === Extract agent_dir, agent_pos, and goal_pos ===
 		# Num walls placed currently
 		if params.fixed_n_wall_steps:
+			
 			n_walls = params.n_walls
 			enc_len = self._get_encoding_dim()
 			wall_pos_idx = jnp.flip(enc[:params.n_walls])
-			agent_pos_idx = enc_len-2 # Enc is full length
-			goal_pos_idx = enc_len-3
+			agent_pos_idx = enc_len-3 # Enc is full length
+			goal_pos_idx = enc_len-2
 		else:
 			n_walls = jnp.round(
 				params.n_walls*enc[0]/self.n_tiles
@@ -341,15 +348,16 @@ class UEDMaze(environment.Environment):
 			else:
 				wall_pos_idx = jnp.flip(enc[1:params.n_walls+1])
 				enc_len = n_walls + 3 # [wall_pos] + len((n_walls, goal, agent))
-			agent_pos_idx = enc_len-1 # Positions are relative to n_walls when n_walls is variable.
-			goal_pos_idx = enc_len-2
+			agent_pos_idx = enc_len-2 # Positions are relative to n_walls when n_walls is variable.
+			goal_pos_idx = enc_len-1
 
 		# Get agent + goal info (set agent/goal pos 1-step out of range if they are not yet placed)
 		goal_placed = state.time > jnp.array([goal_pos_idx], dtype=jnp.uint32)
+		#print(goal_placed, "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG", flush=True)
 		goal_pos = \
 			goal_placed*jnp.array([enc[goal_pos_idx]%w, enc[goal_pos_idx]//w], dtype=jnp.uint32) \
 			+ (~goal_placed)*jnp.array([w,h], dtype=jnp.uint32)
-
+		
 		agent_placed = state.time > jnp.array([agent_pos_idx], dtype=jnp.uint32)
 		agent_pos = \
 			agent_placed*jnp.array([enc[agent_pos_idx]%w, enc[agent_pos_idx]//w], dtype=jnp.uint32) \
@@ -372,7 +380,7 @@ class UEDMaze(environment.Environment):
 		goal_mask = goal_placed*(~(jnp.arange(h*w) == state.encoding[goal_pos_idx])) + ~goal_placed*wall_map
 		wall_map = wall_map*agent_mask*goal_mask 
 		wall_map = wall_map.reshape(h,w)
-
+		#jax.debug.print("count of true {}", jnp.count_nonzero(wall_map))
 		return EnvInstance(
 			agent_pos=agent_pos,
 			agent_dir_idx=agent_dir_idx,
@@ -380,6 +388,72 @@ class UEDMaze(environment.Environment):
 			wall_map=wall_map
 		)
 
+	def get_env_instance_not_full(
+			self, 
+			key: chex.PRNGKey,
+			state: EnvState
+		) -> chex.Array:
+		"""
+		Converts internal encoding to an instance encoding that 
+		can be interpreted by the `set_to_instance` method 
+		the paired Environment class.
+		"""
+		params = self.params
+		h = params.height
+		w = params.width
+		enc = state.encoding
+
+		# === Extract agent_dir, agent_pos, and goal_pos ===
+		# Num walls placed currently
+		if params.fixed_n_wall_steps:
+			n_walls = params.n_walls
+			enc_len = self._get_encoding_dim()
+			wall_pos_idx = jnp.flip(enc[:params.n_walls])
+			agent_pos_idx = enc_len-3 # Enc is full length
+		else:
+			n_walls = jnp.round(
+				params.n_walls*enc[0]/self.n_tiles
+			).astype(jnp.uint32)
+			if params.first_wall_pos_sets_budget:
+				wall_pos_idx = jnp.flip(enc[:params.n_walls]) # So 0-padding does not override pos=0
+				enc_len = n_walls + 2 # [wall_pos] + len((goal, agent))
+			else:
+				wall_pos_idx = jnp.flip(enc[1:params.n_walls+1])
+				enc_len = n_walls + 3 # [wall_pos] + len((n_walls, goal, agent))
+			agent_pos_idx = enc_len-1 # Positions are relative to n_walls when n_walls is variable.
+
+		# Get agent + goal info (set agent/goal pos 1-step out of range if they are not yet placed)
+
+		agent_placed = state.time > jnp.array([agent_pos_idx], dtype=jnp.uint32)
+		agent_pos = \
+			agent_placed*jnp.array([enc[agent_pos_idx]%w, enc[agent_pos_idx]//w], dtype=jnp.uint32) \
+			+ (~agent_placed)*jnp.array([w,h], dtype=jnp.uint32)
+
+		agent_dir_idx = jnp.floor((4*enc[-1]/self.n_tiles)).astype(jnp.uint8)
+
+		# Make wall map
+		wall_start_time = jnp.logical_and( # 1 if explicitly predict # blocks, else 0
+			not params.fixed_n_wall_steps,
+			not params.first_wall_pos_sets_budget
+		).astype(jnp.uint32)
+		wall_map = jnp.zeros(h*w, dtype=jnp.bool_)
+		wall_values = jnp.arange(params.n_walls) + wall_start_time < jnp.minimum(state.time, n_walls + wall_start_time)
+		wall_values = jnp.flip(wall_values)
+		wall_map = wall_map.at[wall_pos_idx].set(wall_values)
+
+		# Zero out walls where agent and goal reside
+		agent_mask = agent_placed*(~(jnp.arange(h*w) == state.encoding[agent_pos_idx])) + ~agent_placed*wall_map
+		#goal_mask = goal_placed*(~(jnp.arange(h*w) == state.encoding[goal_pos_idx])) + ~goal_placed*wall_map
+		wall_map = wall_map*agent_mask 
+		wall_map = wall_map.reshape(h,w)
+		#jax.debug.print("count of true {}", jnp.count_nonzero(wall_map))
+		return EnvInstance(
+			agent_pos=agent_pos,
+			agent_dir_idx=agent_dir_idx,
+			goal_pos=jnp.array([1000,1000], dtype=jnp.uint32),
+			wall_map=wall_map
+		)
+	
 	def is_terminal(self, state: EnvState) -> bool:
 		# if params.fixed_n_wall_steps:
 		# 	max_n_walls = params.n_walls
@@ -389,7 +463,10 @@ class UEDMaze(environment.Environment):
 		# 	max_episode_steps = \
 		# 		self.max_episode_steps() - (params.n_walls - max_n_walls)
 		# 	done_steps = state.time >= max_episode_steps
-		done_steps = state.time >= self.max_episode_steps()
+		if self.is_alice_env :
+			done_steps = state.time >= self.max_episode_steps() - 1
+		else: 
+			done_steps = state.time >= self.max_episode_steps()
 		return jnp.logical_or(done_steps, state.terminal)
 
 	def _get_post_terminal_obs(self, state: EnvState):
@@ -478,6 +555,7 @@ class UEDMaze(environment.Environment):
 		if not self.params.set_agent_dir:
 			encoding_dim += 1 # max steps is 1 less than full encoding dim
 
+
 		return encoding_dim
 
 	def max_episode_steps(self) -> int:
@@ -486,11 +564,18 @@ class UEDMaze(environment.Environment):
 			max_episode_steps = self.params.n_walls + 2
 		else:
 			max_episode_steps = self.params.n_walls + 3
-
+		
 		if self.params.set_agent_dir:
 			max_episode_steps += 1
 
 		return max_episode_steps
+
+	def add_reward_structure_for_bob(self, key:chex.PRNGKey, base_state : EnvState, alice_final_state : chex.Array) -> Tuple[EnvState]:
+		new_state = base_state
+		action = jnp.int32(self.params.width*alice_final_state[1]+alice_final_state[0])
+		_,new_state,_,_,_ = self.step_env(key, new_state, action)
+		return new_state
+
 
 
 if hasattr(__loader__, 'name'):

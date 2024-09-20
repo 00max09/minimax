@@ -22,7 +22,7 @@ from minimax.models.registration import register
 
 class SokobanBasicModel(nn.Module):
 	"""Split Actor-Critic Architecture for PPO."""
-	output_dim: int = 4
+	output_dim: int = 7
 	n_hidden_layers: int = 1
 	hidden_dim: int = 32
 	n_conv_filters: int = 16

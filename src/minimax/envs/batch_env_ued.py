@@ -51,8 +51,12 @@ class BatchUEDEnv:
 		self.sub_batch_size = n_parallel*n_eval
 
 		self.reset_student = jax.vmap(self._reset_student, in_axes=(0,0,None))
+		self.reset_for_alice = jax.vmap(self._reset_for_alice, in_axes=(0,0,None))
+		
 		self.step_teacher = jax.vmap(self._step_teacher, in_axes=0)
 		self.step_student = jax.vmap(self._step_student, in_axes=0)
+		self.step_alice_student = jax.vmap(self._step_alice_student, in_axes=0)
+		
 		
 		self.set_env_instance = jax.vmap(self._set_env_instance, in_axes=0)
 		self.get_env_metrics = jax.vmap(self._get_env_metrics, in_axes=0)
@@ -114,7 +118,29 @@ class BatchUEDEnv:
 		brngs = jax.random.split(rng, self.n_parallel)
 		obs, state, extra = \
 			jax.vmap(self.env.reset_student)(brngs, ued_state)
+		#jax.debug.print("extras {}",extra)
+		obs = jax.tree_util.tree_map(
+			lambda x: jnp.repeat(
+						jnp.expand_dims(jnp.repeat(x, self.n_eval, 0), 0), n_students, 0), obs)
 
+		state = jax.tree_util.tree_map(
+			lambda x: jnp.repeat(
+				jnp.expand_dims(jnp.repeat(x, self.n_eval, 0), 0), n_students, 0), state)
+
+		extra = jax.tree_util.tree_map(
+			lambda x: jnp.repeat(
+				jnp.expand_dims(jnp.repeat(x, self.n_eval, 0), 0), n_students, 0), extra)
+
+		return obs, state, extra
+
+	def _reset_for_alice(self, rng, ued_state, n_students):
+		"""
+		Reset the student MDP based on the state of the teacher MDP.
+		"""
+		brngs = jax.random.split(rng, self.n_parallel)
+		obs, state, extra= \
+			jax.vmap(self.env.reset_for_alice)(brngs, ued_state)
+		#extra = {"ep_return": jnp.array([0])}
 		obs = jax.tree_util.tree_map(
 			lambda x: jnp.repeat(
 						jnp.expand_dims(jnp.repeat(x, self.n_eval, 0), 0), n_students, 0), obs)
@@ -135,6 +161,13 @@ class BatchUEDEnv:
 		"""
 		brngs = jax.random.split(rng, self.sub_batch_size)
 		return jax.vmap(self.env.step)(brngs, state, action, reset_state, extra)
+	
+	def _step_alice_student(self, rng, state, action, reset_state, extra=None):
+		"""
+		Step the student MDP.
+		"""
+		brngs = jax.random.split(rng, self.sub_batch_size)
+		return jax.vmap(self.env.step_alice)(brngs, state, action, reset_state, extra)
 
 	def _set_env_instance(self, instance):
 		"""
@@ -149,10 +182,10 @@ class BatchUEDEnv:
 	def _add_reward_structure_for_bob(
 		self, 
 		rng, 
-		base_state, 
+		ued_state, 
 		alice_final_state
 	):
 		"""Environment-specific reward setter."""
 		brngs = jax.random.split(rng, self.sub_batch_size)
-		return jax.vmap(self.env.add_reward_structure_for_bob)(brngs, base_state, alice_final_state)
+		return jax.vmap(self.env.add_reward_structure_for_bob)(brngs, ued_state, alice_final_state)
 

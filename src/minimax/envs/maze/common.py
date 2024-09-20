@@ -84,9 +84,10 @@ def make_maze_map(
 	agent_x,agent_y = agent_pos
 	maze_map = maze_map.at[agent_y,agent_x,:].set(agent)
 
-	goal = jnp.array([OBJECT_TO_INDEX['goal'], COLOR_TO_INDEX['green'], 0], dtype=jnp.uint8)
-	goal_x,goal_y = goal_pos
-	maze_map = maze_map.at[goal_y,goal_x,:].set(goal)
+	if(goal_pos is not None):
+		goal = jnp.array([OBJECT_TO_INDEX['goal'], COLOR_TO_INDEX['green'], 0], dtype=jnp.uint8)
+		goal_x,goal_y = goal_pos
+		maze_map = maze_map.at[goal_y,goal_x,:].set(goal)
 
 	# Add observation padding
 	if pad_obs:

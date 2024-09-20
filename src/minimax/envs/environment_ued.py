@@ -71,6 +71,18 @@ class UEDEnvironment:
 		encoding = self.ued_env.get_env_instance(rng, ued_state)
 		return self.env.set_env_instance(encoding)
 
+	def reset_for_alice(
+		self,
+		rng: chex.PRNGKey, 
+		ued_state: EnvState,
+	) -> Tuple[chex.ArrayTree, EnvState]:
+		"""
+		Reset the student based on 
+		"""
+		encoding = self.ued_env.get_env_instance(rng, ued_state)
+		return self.env.set_env_instance(encoding)
+	
+
 	def step_student(
 		self,
 		rng: chex.PRNGKey,
@@ -84,16 +96,31 @@ class UEDEnvironment:
 			action, 
 			reset_state=reset_state)
 
+	def step_alice(
+		self,
+		rng: chex.PRNGKey,
+		state: EnvState,
+		action: Union[int, float],
+		reset_state: Optional[chex.ArrayTree] = None
+	) -> Tuple[chex.ArrayTree, EnvState, float, bool, dict]:
+		return self.env.step_alice(
+			rng, 
+			state, 
+			action, 
+			reset_state=reset_state)
+	
+
+	
 	def add_reward_structure_for_bob(
 		self, 
 		key:chex.PRNGKey, 
-		base_state : EnvState, 
-		alice_final_state : EnvState
+		ued_state : EnvState, 
+		alice_final_state : chex.Array
 	) -> Tuple[chex.Array, EnvState]:
 		"""Environment-specific reward set."""
-		return self.env.add_reward_structure_for_bob(
+		return self.ued_env.add_reward_structure_for_bob(
 			key,
-			base_state,
+			ued_state,
 			alice_final_state
 		)
 

@@ -462,6 +462,42 @@ class SmallCorridor(MazeSingleton):
 			normalize_obs=normalize_obs
 		)
 
+class NoWalls(MazeSingleton):
+	def __init__(
+		self, 
+		see_agent=False,
+		normalize_obs=False):
+		wall_map = [
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "0 0 0 0 0 0 0 0 0 0 0 0 0"
+		]
+		goal_pos = [
+			(2,3),(4,3),(6,3),(8,3),(10,3),
+			(2,9),(4,9),(6,9),(8,9),(10,9),
+		]
+		agent_pos = (0,6)
+		agent_dir_idx = None
+
+		super().__init__(
+			wall_map=wall_map,
+			goal_pos=goal_pos,
+			agent_pos=agent_pos,
+			agent_dir_idx=agent_dir_idx,
+			see_agent=see_agent,
+			normalize_obs=normalize_obs
+		)
+
 
 class LargeCorridor(MazeSingleton):
 	def __init__(
@@ -938,7 +974,7 @@ class PerfectMazeMedium(PerfectMaze):
 
 class PerfectMazeExtraLarge(PerfectMaze):
 	def __init__(self, *args, **kwargs):
-		super().__init__(height=101, width=101, *args, **kwargs)
+		super().__init__(height=51, width=51, *args, **kwargs)
 
 
 class Memory(MazeSingleton):
@@ -1102,6 +1138,7 @@ register(env_id='Maze-StandardMaze3', entry_point=module_path + ':StandardMaze3'
 register(env_id='Maze-SmallCorridor', entry_point=module_path + ':SmallCorridor')
 register(env_id='Maze-LargeCorridor', entry_point=module_path + ':LargeCorridor')
 
+register(env_id='Maze-NoWalls', entry_point=module_path + ':NoWalls')
 register(env_id='Maze-FourRooms', entry_point=module_path + ':FourRooms')
 register(env_id='Maze-Crossing', entry_point=module_path + ':Crossing')
 register(env_id='Maze-PerfectMaze', entry_point=module_path + ':PerfectMaze')

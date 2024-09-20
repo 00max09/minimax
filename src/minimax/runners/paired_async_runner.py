@@ -36,6 +36,7 @@ from collections import OrderedDict
 def merge_dict(x, y):
 	for a in x.keys() :
 		x[a] = jnp.concatenate([x[a], y[a]])
+	return x
 
 def merge_batches(x, y):
 	batch_kwargs = dict(
@@ -146,7 +147,7 @@ class PAIREDASYNCRunner:
 			ued_wrappers=[]
 		)
 		self.teacher_n_rollout_steps = \
-			self.benv.env.ued_max_episode_steps()
+			self.benv.env.ued_max_episode_steps()-1
 
 		self.alice_rollout = RolloutStorage(
 			discount=discount,
@@ -200,9 +201,9 @@ class PAIREDASYNCRunner:
 		self._update_ued_ep_stats = jax.vmap(jax.vmap(self.ued_rolling_stats.update_stats))
 
 		if self.render:
-			from envs.viz.grid_viz import GridVisualizer
+			from minimax.envs.viz.grid_viz import GridVisualizer
 			self.viz = GridVisualizer()
-			self.viz.show()
+			#self.viz.show()
 
 	def reset(self, rng):
 		self.n_updates = 0
@@ -304,7 +305,7 @@ class PAIREDASYNCRunner:
 		runner_state = list(runner_state)
 		runner_state[1] = runner_state[1].load_state_dict(state[1])
 		runner_state[6] = runner_state[6].load_state_dict(state[6])
-		runner_state[11] = runnner_state[11].load_state_dice(state[11])
+		runner_state[11] = runner_state[11].load_state_dict(state[11])
 		return tuple(runner_state)
 
 	@partial(jax.jit, static_argnums=(0,2,3))
@@ -330,10 +331,22 @@ class PAIREDASYNCRunner:
 
 		rng, *vrngs = jax.random.split(rng, pop.n_agents+1)
 
-		if pop is self.alice_pop or pop is self.bob_pop:
+		if pop is self.bob_pop or pop is self.alice_pop:
 			step_fn = self.benv.step_student
+		elif pop is self.alice_pop:
+			step_fn = self.benv.step_alice_student
 		else:
 			step_fn = self.benv.step_alice_teacher
+		
+		#if pop is self.alice_pop:
+			#if self.render:
+		 		#print(state.agent_pos, "alice step ", action, flush=True)
+				#self.viz.render(
+		 		#	self.benv.env.env.params, 
+		 		#	jax.tree_util.tree_map(lambda x: x[0][0], state))
+		 		#print("ALL YOU NEED IS SMILE 1", flush=True)
+			 	#self.viz.screenshot("moviedouble/")
+		 # Reset student ep_stats
 		step_args = (jnp.array(vrngs), state, action)
 
 		if reset_state is not None: # Needed for student to reset to same instance
@@ -352,11 +365,7 @@ class PAIREDASYNCRunner:
 
 		rollout = rollout_mgr.append(rollout, *step)
 
-		if self.render and pop is self.bob_pop:
-			self.viz.render(
-				self.benv.env.env.params, 
-				jax.tree_util.tree_map(lambda x: x[0][0], state))
-
+		
 		return rollout, next_state, next_obs, next_carry, done, info, extra
 
 	@partial(jax.jit, static_argnums=(0,2,3,4))
@@ -527,6 +536,13 @@ class PAIREDASYNCRunner:
 		"""
 		Perform one update step: rollout teacher + students
 		"""
+		# def bool2int(x):
+		# 	if x:
+		# 		return "1b"
+		# 	else:
+		# 		return "0b"
+		# jnp.set_printoptions(threshold=10000, linewidth=200, formatter={"bool": bool2int})
+	
 		if self.n_devices > 1:
 			rng = jax.random.fold_in(rng, jax.lax.axis_index('device'))
 
@@ -564,16 +580,22 @@ class PAIREDASYNCRunner:
 				ep_stats=ued_ep_stats
 			)
 
-		# === Reset student to new envs + rollout students
+
 		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
 		alice_obs, alice_start_state, alice_extra = jax.tree_util.tree_map(
 			lambda x:x.squeeze(0), self.benv.reset_student(
 				jnp.array(vrngs),
 				ued_state, 
 				self.alice_pop.n_agents)) 
-				# jeśli dobrze rozumiem z jakiegoś powodu to jest nie vmapowane
-		alice_reset_state = alice_state
-		# Reset student ep_stats
+		alice_reset_state = alice_start_state
+		if self.render:
+			for i in range(32):
+				self.viz.render(
+					self.benv.env.env.params,
+					jax.tree_util.tree_map(lambda x: x[0][i], alice_start_state))
+		# 	print("ALL YOU NEED IS SMILE 1", flush=True)
+				self.viz.screenshot("moviedouble/")
+		# # Reset student ep_stats
 		st_rollout_batch_shape = (1,self.n_parallel*self.n_eval)
 		ep_stats = self.rolling_stats.reset_stats(
 			batch_shape=st_rollout_batch_shape)
@@ -592,25 +614,53 @@ class PAIREDASYNCRunner:
 				alice_obs, 
 				alice_carry, 
 				done,
-				reset_state=alice_reset_state, 
+				reset_state=alice_reset_state,
 				extra=alice_extra, 
 				ep_stats=alice_ep_stats)
-
+		
+		# if self.render:
+		# 	self.viz.render(
+		# 		self.benv.env.env.params, 
+		# 		jax.tree_util.tree_map(lambda x: x[0][0], alice_state))
+		# 	print("ALL YOU NEED IS SMILE 2", flush=True)
+		# 	self.viz.screenshot("moviedouble/")
+		if self.render:
+			for i in range(32):
+				self.viz.render(
+					self.benv.env.env.params,
+					jax.tree_util.tree_map(lambda x: x[0][i], alice_state))
+		# 	print("ALL YOU NEED IS SMILE 1", flush=True)
+				self.viz.screenshot("moviedouble/")		
 		# Add rewards
+		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
+		ued_state_after_reward = self.benv.add_reward_structure_for_bob(
+				jnp.array(vrngs),
+				ued_state,
+				alice_state.agent_pos)
+		
 		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
 		bob_obs, bob_start_state, bob_extra = jax.tree_util.tree_map(
 			lambda x:x.squeeze(0), self.benv.reset_student(
 				jnp.array(vrngs),
-				ued_state, 
+				ued_state_after_reward, 
 				self.bob_pop.n_agents)) 
 
-		rng, *vrngs = jax.random.split(rng, self.teacher_pop.n_agents+1)
-		_, bob_reset_state = self.benv.add_reward_structure_for_bob(
-				jnp.array(vrngs),
-				alice_reset_state, 
-				alice_state) #???? nie wiem
-				
+		bob_reset_state = bob_start_state
+		#jax.debug.print("{}", bob_start_state)
 		# Bob rollout
+		# if self.render:
+		# 	self.viz.render(
+		# 		self.benv.env.env.params, 
+		# 		jax.tree_util.tree_map(lambda x: x[0][0], bob_start_state))
+		# 	print("ALL YOU NEED IS SMILE 3", flush=True)
+		# 	self.viz.screenshot("moviedouble/")
+		if self.render:
+			for i in range(32):
+				self.viz.render(
+					self.benv.env.env.params,
+					jax.tree_util.tree_map(lambda x: x[0][i], bob_start_state))
+		# 	print("ALL YOU NEED IS SMILE 1", flush=True)
+				self.viz.screenshot("moviedouble/")
 		rng, subrng = jax.random.split(rng)
 		bob_rollout, bob_state, bob_obs, bob_carry, bob_extra, bob_ep_stats = \
 			self._rollout(
@@ -626,7 +676,8 @@ class PAIREDASYNCRunner:
 				reset_state=bob_reset_state, 
 				extra=bob_extra, 
 				ep_stats=bob_ep_stats)
-
+		
+		#jax.debug.print("{}", bob_ep_stats)
 		# === Update Bob with PPO
 		# PPOAgent vmaps over the train state and batch. Batch must be N x EM
 		bob_rollout_last_value = self.bob_pop.get_value(
@@ -682,7 +733,9 @@ class PAIREDASYNCRunner:
 		# --------------------------------------------------
 		# Collect metrics
 		if self.track_env_metrics:
+			#jax.debug.print("sumy scian{}", jnp.sum( bob_reset_state.wall_map, axis=1))
 			env_metrics = self.benv.get_env_metrics(bob_reset_state)
+			#jax.debug.print("staty{}", env_metrics)
 		else:
 			env_metrics = None
 

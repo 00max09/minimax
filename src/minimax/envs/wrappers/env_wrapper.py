@@ -109,5 +109,13 @@ class EnvWrapper:
 
 		return self._append_extra_to_tuple(_tuple)
 
+	def reset_for_alice(
+		self, 
+		key: chex.PRNGKey,
+		state: chex.ArrayTree,
+	) -> Tuple[chex.ArrayTree, EnvState, chex.ArrayTree]:
+		_tuple = self._env.reset_for_alice(key, state)
+
+		return self._append_extra_to_tuple(_tuple)
 	def __getattr__(self, attr):
 		return getattr(self._env, attr)

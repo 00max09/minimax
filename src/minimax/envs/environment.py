@@ -94,6 +94,50 @@ class Environment(object):
 		return obs, state, reward, done, info
 
 	@partial(jax.jit, static_argnums=(0,4))
+	def step_alice(
+		self,
+		key: chex.PRNGKey,
+		state: EnvState,
+		action: Union[int, float],
+		reset_on_done: bool = False,
+		reset_state: Optional[chex.ArrayTree] = None,
+	) -> Tuple[chex.ArrayTree, EnvState, float, bool]:
+		"""Performs step transitions in the environment."""
+		# Use default env parameters if no others specified
+		if hasattr(self, 'params'):
+			params = self.params
+		else:
+			params = self.default_params
+
+		key, key_reset = jax.random.split(key)
+		obs_st, state_st, reward, done, info = self.step_env(
+			key, state, action
+		)
+
+		if reset_on_done:
+			if reset_state is not None:
+				state_re = reset_state
+				obs_re = self.get_obs(reset_state)
+			else:
+				if hasattr(params, 'singleton_seed') \
+					and params.singleton_seed >= 0:
+					key_reset = jax.random.PRNGKey(params.singleton_seed)
+
+				obs_re, state_re = self.reset_env(key_reset)
+
+			# Auto-reset environment based on termination
+			state = jax.tree_map(
+				lambda x, y: jax.lax.select(done, x, y), state_re, state_st
+			)
+			obs = jax.tree_map(
+				lambda x, y: jax.lax.select(done, x, y), obs_re, obs_st
+			)
+		else:
+			obs, state = obs_st, state_st
+
+		return obs, state, reward, done, info
+
+	@partial(jax.jit, static_argnums=(0,4))
 	def alice_step(
 		self,
 		key: chex.PRNGKey,
@@ -174,8 +218,8 @@ class Environment(object):
 	def add_reward_structure_for_bob(
 		self, 
 		key:chex.PRNGKey, 
-		base_state : EnvState, 
-		alice_final_state : EnvState
+		ued_state, 
+		alice_final_state : chex.Array
 	) -> Tuple[chex.Array, EnvState]:
 		"""Environment-specific reward set."""
 		raise NotImplementedError
@@ -208,6 +252,15 @@ class Environment(object):
 		"""
 		raise NotImplementedError
 
+	def get_env_instance_not_full(
+		self,
+		key: chex.PRNGKey,
+		state: EnvState
+	) -> chex.ArrayTree:
+		"""
+		Implemented for UED envs.
+		"""
+		raise NotImplementedError
 	def get_obs(self, state: EnvState) -> chex.ArrayTree:
 		"""Applies observation function to state."""
 		raise NotImplementedError

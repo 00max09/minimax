@@ -77,6 +77,7 @@ def make(
 ):  
 	"""The minimax equivalent of OpenAI's env.make(env_name)"""
 	if env_id not in env2entry.keys():
+		print(env_id, flush=True)
 		raise ValueError(f"{env_id} is not registered.")
 	else:
 		entry = env2entry[env_id]
